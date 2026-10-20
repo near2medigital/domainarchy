@@ -1,0 +1,2491 @@
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const DEG = Math.PI / 180;
+  const R = 40, SQ3 = Math.sqrt(3), TODAY = 42, BASE = 30;
+  const DIRS = [[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]];
+  const COS = [], SIN = [];
+  for (let i = 0; i < 6; i++) { const a = (60 * i - 30) * DEG; COS.push(Math.cos(a)); SIN.push(Math.sin(a)); }
+
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hash(n) { n = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b); n ^= n >>> 13; n = Math.imul(n, 0xc2b2ae35); n ^= n >>> 16; return (n >>> 0) / 4294967296; }
+  const rand = rng(20261016);
+  const pick = (a, r = rand) => a[Math.floor(r() * a.length)];
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const gbp = n => '£' + Math.round(n).toLocaleString('en-GB');
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const FACTIONS = [
+    { name: 'Crimson Syndicate', color: '#E5334B' },
+    { name: 'Blue Apex', color: '#2F8CFF' },
+    { name: 'Gold Legion', color: '#F5B82E' },
+    { name: 'Verdant Order', color: '#2FCB7A' },
+    { name: 'Violet Circle', color: '#A374FF' },
+  ];
+
+  const ZONES = [
+    { id: 'metropolis', label: 'The Metropolis', short: 'Metropolis', max469: 3, max61: 1, max4921: 4, rent: 10, floor: 40, elev: 46, top: '#141D3E', sideR: '#0F1733', sideL: '#090F24', rim: '#22E6FF', occ: 0.95 },
+    { id: 'suburbs', label: 'The Suburbs', short: 'Suburbs', max469: 8, max61: 2, max4921: 16, rent: 3, floor: 12, elev: 24, top: '#2A2117', sideR: '#1E170F', sideL: '#140F09', rim: '#FFB224', occ: 0.58 },
+    { id: 'wildlands', label: 'The Wildlands', short: 'Wildlands', max469: 12, max61: 4, max4921: 40, rent: 1, floor: 4, elev: 6, top: '#12291D', sideR: '#0C1E14', sideL: '#07140D', rim: '#38D68B', occ: 0.35 },
+  ];
+
+  /* ---------------- Brands Data ---------------- */
+  const SEO_BRANDS = [
+    { name: 'Screaming Frog', cat: 'seo', tag: 'Crawler & log file analyzer', url: 'screamingfrog.co.uk', f: 3, col: '#2FCB7A' },
+    { name: 'Ahrefs', cat: 'seo', tag: 'Backlink authority & keywords', url: 'ahrefs.com', f: 1, col: '#2F8CFF' },
+    { name: 'SEMrush', cat: 'seo', tag: 'Search marketing & visibility', url: 'semrush.com', f: 0, col: '#FF5A5F' },
+    { name: 'Moz Pro', cat: 'seo', tag: 'Domain Authority & rank tracker', url: 'moz.com', f: 1, col: '#00C2A8' },
+    { name: 'SearchEngineLand', cat: 'seo', tag: 'Search news & algorithms', url: 'searchengineland.com', f: 2, col: '#F5B82E' },
+    { name: 'BrightLocal', cat: 'seo', tag: 'Local SEO citations & GBP', url: 'brightlocal.com', f: 3, col: '#84CC16' },
+    { name: 'FatJoe', cat: 'seo', tag: 'Link building & digital PR', url: 'fatjoe.com', f: 4, col: '#A855F7' },
+    { name: 'Sitebulb', cat: 'seo', tag: 'Visual website auditor', url: 'sitebulb.com', f: 2, col: '#FFB400' },
+    { name: 'Search Engine Journal', cat: 'seo', tag: 'Daily SEO strategies', url: 'searchenginejournal.com', f: 1, col: '#06B6D4' },
+    { name: 'AirPR Wire', cat: 'seo', tag: 'Entity PR syndication', url: 'airprwire.io', f: 0, col: '#E5334B' }
+  ];
+
+  const FICTIONAL_SEO = [
+    ['Crawlwright', 'Site crawler & log analyser', 'crawlwright.example'], ['Backrank', 'Backlink authority & keywords', 'backrank.example'],
+    ['Visiblr', 'Search marketing & visibility', 'visiblr.example'], ['Rankmoor', 'Domain strength & rank tracker', 'rankmoor.example'],
+    ['Searchbeat', 'Search news & algorithms', 'searchbeat.example'], ['Localark', 'Local SEO citations & profiles', 'localark.example'],
+    ['Linkforge', 'Link building & digital PR', 'linkforge.example'], ['Auditbulb', 'Visual website auditor', 'auditbulb.example'],
+    ['SEO Daily Ledger', 'Daily SEO strategies', 'seodailyledger.example'], ['EntityWire', 'Entity PR syndication', 'entitywire.example']
+  ];
+  if (new URLSearchParams(location.search).has('public')) SEO_BRANDS.forEach((b, i) => { b.name = FICTIONAL_SEO[i][0]; b.tag = FICTIONAL_SEO[i][1]; b.url = FICTIONAL_SEO[i][2]; });
+  const GEN_NAMES = ['Nexova', 'Vorix', 'Lumion', 'Kriar', 'Axoum', 'Talex', 'Zently', 'Orbora', 'Pyria', 'Quoix', 'Mavara', 'Solari', 'Rynyx', 'Belora', 'Druix'];
+  const CATEGORIES = ['seo', 'saas', 'local', 'creative'];
+  const TAGLINES = [
+    'AI workflows for growth teams',
+    'Specialty coffee & fresh pastries',
+    'Digital systems & bespoke design',
+    'Cloud infrastructure monitoring',
+    'Commercial electrical installations',
+    'Modern UX architecture & audits'
+  ];
+
+  const TAGS_BY_CAT = {
+    seo: ['Rank tracking for agencies', 'Technical audits at scale', 'Local citations and listings', 'Digital PR and link outreach', 'Keyword and gap research'],
+    saas: ['AI workflows for growth teams', 'Cloud infrastructure monitoring', 'Billing and invoicing, simplified', 'Customer support automation', 'Product analytics for founders'],
+    local: ['Specialty coffee & fresh pastries', 'Commercial electrical installations', 'Family-run joinery and fit-outs', 'Same-day fresh flowers', 'Mobile vehicle detailing'],
+    creative: ['Digital systems & bespoke design', 'Modern UX architecture & audits', 'Brand identity and motion', 'Illustration and packaging', 'Video production for small teams']
+  };
+  function rrect(g, x, y, w, h, r) { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); }
+
+  function makeLogo(spec) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const u = 40;
+    g.translate(64, 64); g.lineCap = 'round'; g.lineJoin = 'round';
+    const { c1, c2 } = spec;
+    const s = spec.shape % 6;
+    if (s === 0) {
+      g.strokeStyle = c1; g.lineWidth = u * 0.32; g.beginPath(); g.arc(0, 0, u * 0.86, 0, 6.283); g.stroke();
+      g.fillStyle = c2; g.beginPath(); g.arc(0, 0, u * 0.36, 0, 6.283); g.fill();
+    } else if (s === 1) {
+      g.fillStyle = c1; g.beginPath(); g.moveTo(0, -u); g.lineTo(u, u * 0.8); g.lineTo(-u, u * 0.8); g.closePath(); g.fill();
+      g.fillStyle = c2; g.fillRect(-u * 0.42, u * 0.22, u * 0.84, u * 0.2);
+    } else if (s === 2) {
+      g.fillStyle = c1; rrect(g, -u, -u, u * 2, u * 2, u * 0.4); g.fill();
+      g.strokeStyle = c2; g.lineWidth = u * 0.26; g.beginPath(); g.moveTo(-u * 0.55, u * 0.55); g.lineTo(u * 0.55, -u * 0.55); g.stroke();
+    } else if (s === 3) {
+      g.fillStyle = c1; g.fillRect(-u, -u * 0.2, u * 0.5, u * 1.2); g.fillRect(-u * 0.25, -u, u * 0.5, u * 2);
+      g.fillStyle = c2; g.fillRect(u * 0.5, -u * 0.6, u * 0.5, u * 1.6);
+    } else if (s === 4) {
+      g.fillStyle = c1; g.beginPath(); g.arc(0, 0, u, 0, 6.283); g.fill();
+      g.fillStyle = c2; g.beginPath(); g.moveTo(0, -u * 0.6); g.lineTo(u * 0.5, u * 0.5); g.lineTo(-u * 0.5, u * 0.5); g.closePath(); g.fill();
+    } else {
+      g.strokeStyle = c1; g.lineWidth = u * 0.28; g.beginPath(); g.moveTo(-u, -u * 0.3); g.lineTo(0, u * 0.7); g.lineTo(u, -u * 0.3); g.stroke();
+      g.fillStyle = c2; g.beginPath(); g.arc(0, -u * 0.3, u * 0.3, 0, 6.283); g.fill();
+    }
+    return c;
+  }
+
+  function tinted(src, color) {
+    const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const g = c.getContext('2d'); g.drawImage(src, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = color; g.fillRect(0, 0, c.width, c.height); return c;
+  }
+
+  /* ---------------- Small-Business Micro-Ads ---------------- */
+  const ADS = [
+    { name: "Bea's Bakes", tag: 'Sourdough by 7am, every day', col: '#FFB224', url: 'beasbakes.co.uk' },
+    { name: 'Marsh Lane Dog Walks', tag: 'Group walks from £8', col: '#38D68B', url: 'marshdogs.co.uk' },
+    { name: 'Clarke & Daughter', tag: 'Joinery & fitted wardrobes', col: '#2F8CFF', url: 'clarkejoinery.co.uk' },
+    { name: 'The Tide Café', tag: 'Crab rolls on the quay', col: '#22E6FF', url: 'thetidecafe.co.uk' },
+    { name: 'Hollow Oak Florist', tag: 'Same-day fresh bouquets', col: '#FF6FA8', url: 'hollowoak.co.uk' },
+    { name: 'Swift Valeting', tag: 'Mobile drive detailing', col: '#A374FF', url: 'swiftvaleting.co.uk' },
+    { name: 'Kiln Street Pottery', tag: 'Taster classes Saturdays', col: '#F97316', url: 'kilnstreet.co.uk' },
+    { name: 'Fenline Lettings', tag: 'Fair fees, fast repairs', col: '#14B8A6', url: 'fenline.co.uk' },
+    { name: 'Odd Job Ollie', tag: 'Flat-packs, shelves, gutters', col: '#E5334B', url: 'oddjobollie.co.uk' },
+    { name: 'Neon Fox Tattoo', tag: 'Walk-ins on Thursdays', col: '#FF3DCB', url: 'neonfox.co.uk' }
+  ];
+
+  function initials(n) { return n.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || 'AD'; }
+
+  function adImage(ad, w, h) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    const bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#121A33'); bg.addColorStop(1, '#070B17');
+    g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = ad.col; g.fillRect(0, 0, w, 4);
+    const m = h * 0.3;
+    g.beginPath(); g.arc(h * 0.5, h * 0.52, m, 0, 6.283); g.fillStyle = ad.col; g.fill();
+    g.fillStyle = '#070B17'; g.font = `700 ${Math.round(m * 0.95)}px "Chakra Petch", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (ad.logo) {
+      g.save(); g.beginPath(); g.arc(h * 0.5, h * 0.52, m, 0, 6.283); g.clip();
+      g.fillStyle = '#0B1226'; g.fillRect(h * 0.5 - m, h * 0.52 - m, 2 * m, 2 * m);
+      g.drawImage(ad.logo, h * 0.5 - m, h * 0.52 - m, 2 * m, 2 * m); g.restore();
+    } else g.fillText(initials(ad.name), h * 0.5, h * 0.54);
+    g.textAlign = 'left'; g.fillStyle = '#F2F5FF'; g.font = `700 ${Math.round(h * 0.27)}px "Chakra Petch", sans-serif`;
+    g.fillText(ad.name, h * 0.98, h * 0.42, w - h * 1.08);
+    g.fillStyle = 'rgba(220,230,250,.82)'; g.font = `500 ${Math.round(h * 0.17)}px "IBM Plex Sans", sans-serif`;
+    g.fillText(ad.tag, h * 0.98, h * 0.74, w - h * 1.08);
+    g.fillStyle = '#FFB224'; g.font = `600 ${Math.round(h * 0.12)}px "IBM Plex Mono", monospace`; g.textAlign = 'right'; g.fillText('AD', w - 8, h * 0.2);
+    return c;
+  }
+
+  function bannerImage(ad) {
+    const W2 = 540, H2 = 120, c = document.createElement('canvas'); c.width = W2; c.height = H2; const g = c.getContext('2d');
+    const bg = g.createLinearGradient(0, 0, W2, 0); bg.addColorStop(0, '#060A18'); bg.addColorStop(1, '#0C1330');
+    g.fillStyle = bg; g.fillRect(0, 0, W2, H2);
+    g.strokeStyle = 'rgba(120,160,255,.12)'; g.lineWidth = 1;
+    g.beginPath();
+    for (let x = 0; x < W2; x += 24) { g.moveTo(x, 0); g.lineTo(x, H2); }
+    for (let y = 0; y < H2; y += 24) { g.moveTo(0, y); g.lineTo(W2, y); }
+    g.stroke();
+    g.save(); g.shadowColor = ad.col; g.shadowBlur = 12; g.strokeStyle = ad.col; g.lineWidth = 3; g.strokeRect(3, 3, W2 - 6, H2 - 6); g.restore();
+    g.textBaseline = 'middle'; g.textAlign = 'left';
+    g.font = '700 36px "Audiowide", "Chakra Petch", sans-serif';
+    g.fillStyle = ad.col; g.fillText(ad.name.toUpperCase(), 24, 44, W2 - 48 - (ad.logo ? 104 : 0));
+    g.fillStyle = '#FFFFFF'; g.font = '600 20px "Chakra Petch", sans-serif'; g.fillText('AIRSHIP FLYOVER  ·  ' + ad.tag.toUpperCase(), 24, 86, W2 - 48 - (ad.logo ? 104 : 0));
+    if (ad.logo) { g.save(); g.beginPath(); g.arc(W2 - 56, H2 / 2, 40, 0, 6.283); g.clip(); g.fillStyle = '#0B1226'; g.fillRect(W2 - 96, H2 / 2 - 40, 80, 80); g.drawImage(ad.logo, W2 - 96, H2 / 2 - 40, 80, 80); g.restore(); }
+    return c;
+  }
+
+  const AVAIL_AD = { name: 'Your advert here', tag: '£1.50 a day, live in a minute', col: '#FFB224', url: 'domainarchy.io' };
+  for (const a of ADS) { a.img = adImage(a, 300, 110); a.banner = bannerImage(a); }
+  AVAIL_AD.img = adImage(AVAIL_AD, 300, 110);
+
+
+  /* v3.0: local standalone storage + optional authoritative multiplayer transport. */
+  const STORAGE_WORLDS='da_worlds_v30';
+  let localWorlds={},localReady=false,networkOnline=false,networkStream=null,networkRev=0,networkActor=null;
+  const remoteIds=new Map();
+  try {localWorlds=JSON.parse(localStorage.getItem(STORAGE_WORLDS)||'{}')||{};}catch(_){localWorlds={};}
+  function logoForBrand(b) {
+    if(b.logoData){const im=new Image();im.onload=()=>{const cv=document.createElement('canvas');cv.width=cv.height=128;cv.getContext('2d').drawImage(im,0,0,128,128);b.logo=cv;b.tints={};dirty=true;};im.src=b.logoData;}
+  }
+  function createPlayerBrand(detail) {
+    const f=Number(detail.f??1);
+    const b={id:nextBrandId++,name:detail.name,cat:'seo',tag:detail.tag,url:detail.url,f,logo:detail.logo||makeLogo({shape:2,c1:FACTIONS[f].color,c2:'#F2F5FF'}),tints:{},you:true,dwell:0,clicks:0,cheers:0};
+    if(detail.logo&&typeof detail.logo.toDataURL==='function')try{b.logoData=detail.logo.toDataURL('image/png');}catch(_){/* generated fallback */}
+    brands.push(b);return b;
+  }
+  function offerForNewPlacement(){const offer=$('studioLoot').value.trim();return offer?{offer,code:'ARCH-'+Math.floor(Math.random()*1e9).toString(36).toUpperCase(),left:25}:null;}
+  function serializeBrand(b){return {id:b.id,name:b.name,cat:b.cat,tag:b.tag,url:b.url,f:b.f,you:b.you,dwell:b.dwell,clicks:b.clicks,cheers:b.cheers,logoData:b.logoData||null};}
+  function saveLocalWorld(){
+    if(!localReady||networkOnline||!hexes.length)return;
+    localWorlds[currentArena]={
+      held:hexes.filter(h=>occ(h)).map(h=>({q:h.q,r:h.r,brandId:h.brand.id,day:h.day,last:h.last,weeks:h.weeks,status:h.status,shieldH:h.shieldH,lockS:h.lockS,tenancyDays:h.tenancyDays,daysLeft:h.daysLeft,cheers:h.cheers,loot:h.loot||null,claimedAt:h.claimedAt,expiresAt:h.expiresAt,shieldUntil:h.shieldUntil,siegeUntil:h.siegeUntil})),
+      brands:brands.filter(b=>b.you&&b.id!==9999).map(serializeBrand),
+      boards:BOARDS.filter(sl=>sl.booked).map(sl=>({i:sl.i,booked:{...sl.booked,ad:{name:sl.booked.ad.name,tag:sl.booked.ad.tag,url:sl.booked.ad.url,col:sl.booked.ad.col}}})),
+      airship:AIR.paid.map(p=>({ad:{name:p.ad.name,tag:p.ad.tag,url:p.ad.url,col:p.ad.col},left:p.left,total:p.total}))
+    };
+    try{localStorage.setItem(STORAGE_WORLDS,JSON.stringify(localWorlds));}catch(_){toast('Local storage is full; recent changes may not be saved.');}
+  }
+  function restoreLocalWorld(){
+    const snap=localWorlds[currentArena];if(!snap)return;
+    for(const desc of snap.brands||[]){if(brands.some(b=>b.id===desc.id))continue;const b={...desc,logo:makeLogo({shape:2,c1:FACTIONS[desc.f].color,c2:'#F2F5FF'}),tints:{}};brands.push(b);logoForBrand(b);nextBrandId=Math.max(nextBrandId,Number(desc.id)+1);}
+    for(const h of hexes){h.brand=null;h.loot=null;}
+    const byId=new Map(brands.map(b=>[b.id,b]));
+    for(const v of snap.held||[]){const h=map.get(key(v.q,v.r)),b=byId.get(v.brandId);if(!h||!b)continue;setHolder(h,b,v.day??TODAY,v);Object.assign(h,v);h.brand=b;h.loot=v.loot||null;}
+    for(const v of snap.boards||[]){if(BOARDS[v.i]){BOARDS[v.i].booked=v.booked;const a=BOARDS[v.i].booked.ad;a.img=adImage(a,300,110);}}
+    AIR.paid=(snap.airship||[]).map(p=>({...p,ad:{...p.ad,banner:bannerImage(p.ad)}}));updateAirStatus();
+  }
+  function networkCreative(){
+    const c=creative();return {name:c.name,tag:c.tag,url:c.url,f:Number($('studioFaction').value??1),logo:studioLogo?studioLogo.toDataURL('image/png'):null};
+  }
+  function statusLine(state){const el=$('connectionStatus');el.dataset.state=state;el.textContent=(state==='online'?'SHARED':state==='connecting'?'CONNECTING':'LOCAL')+' · V3.0';el.title=state==='online'?'Server-controlled shared arena':'Standalone local preview';}
+  function remoteBrand(remoteId,meta){
+    if(!meta)return null;
+    if(remoteIds.has(remoteId)){const b=remoteIds.get(remoteId);b.name=meta.name;b.tag=meta.tag;b.url=meta.url;b.f=meta.f;b.you=meta.owner===networkActor;return b;}
+    const b={id:nextBrandId++,remoteId,name:meta.name,tag:meta.tag,cat:meta.cat||'seo',url:meta.url,f:Number(meta.f)||0,you:meta.owner===networkActor,dwell:0,clicks:0,cheers:0,tints:{},logo:makeLogo({shape:bShape(remoteId),c1:FACTIONS[meta.f]?.color||'#22E6FF',c2:'#FFF'})};
+    if(meta.logo)b.logoData=meta.logo,logoForBrand(b);
+    brands.push(b);remoteIds.set(remoteId,b);return b;
+  }
+  function bShape(id){return [...id].reduce((a,c)=>a+c.charCodeAt(0),0)%6;}
+  function applyNetwork(snap){
+    if(!snap||snap.arena!==currentArena||snap.rev<networkRev)return;
+    networkActor=snap.viewer.id;networkRev=snap.rev;
+    for(const h of hexes){h.brand=null;h.loot=null;h.siege=null;}
+    for(const item of Object.values(snap.hexes)){
+      const h=map.get(key(item.q,item.r)),b=remoteBrand(item.brandId,snap.brands[item.brandId]);if(!h||!b)continue;
+      setHolder(h,b,TODAY,{last:item.last,weeks:0,status:'held',tenancyDays:item.tenancyDays,cheers:item.cheers});
+      h.day=TODAY;h.loot=item.loot;h.claimedAt=item.claimedAt;h.expiresAt=item.expiresAt;h.shieldUntil=item.shieldUntil;h.siege=item.siege;
+      h.daysLeft=Math.max(0,Math.ceil((item.expiresAt-Date.now())/864e5));
+      h.shieldH=Math.max(0,Math.ceil((item.shieldUntil-Date.now())/36e5));
+      h.status=item.siege?'attack':h.shieldH>0?'shielded':'held';h.lockS=item.siege?Math.max(0,Math.ceil((item.siege.endsAt-Date.now())/1000)):0;
+    }
+    for(const sl of BOARDS){sl.booked=null;const p=snap.boards[sl.i];if(p){const b=remoteBrand(p.brandId,snap.brands[p.brandId]);if(b){const ad={name:b.name,tag:b.tag,url:b.url,col:FACTIONS[b.f].color,logo:b.logo};ad.img=adImage(ad,300,110);sl.booked={ad,until:p.until,days:p.days};}}}
+    AIR.paid=(snap.airship||[]).map(p=>{const b=remoteBrand(p.brandId,snap.brands[p.brandId]);const ad={name:b.name,tag:b.tag,url:b.url,col:FACTIONS[b.f].color,logo:b.logo};ad.banner=bannerImage(ad);return {ad,left:p.left,total:p.total};});
+    if(snap.flight){const fb=remoteBrand(snap.flight.brandId,snap.brands[snap.flight.brandId]);if(fb){AIR.ad={name:fb.name,tag:fb.tag,url:fb.url,col:FACTIONS[fb.f].color,logo:fb.logo};AIR.ad.banner=bannerImage(AIR.ad);AIR.n=snap.flight.n;AIR.dir=AIR.n%2?-1:1;AIR.t0=performance.now()-Math.max(0,Date.now()-snap.flight.t0);$('beaconSponsor').textContent=fb.name.toUpperCase();}}
+    // New visitors always start with server-owned spectator state.
+    streakState.count=snap.viewer.streak;streakState.best=snap.viewer.best;streakState.last=snap.viewer.lastCheer;
+    syncStreakDay();updateStreakUI();
+    if(selected)select(map.get(key(selected.q,selected.r))||null);
+    afterChange();updateAirStatus();
+    if(studioProd==='board')refreshSides();
+    if(!profOpen){const sl=(location.hash.match(/^#brand=([a-z0-9-]+)/)||[])[1];if(sl){const b=brands.find(b=>slugOf(b.name)===sl&&holdingsOf(b).length);if(b)openProfile(b);}}
+    // Repopulate the visible activity log from persistent server events.
+    if(snap.events&&snap.events.length){logEl.innerHTML='';for(const ev of snap.events.slice(0,7)){
+      const li=document.createElement('li'),btn=document.createElement('button');btn.textContent=ev.message;btn.addEventListener('click',()=>{if(Number.isInteger(ev.q)&&Number.isInteger(ev.r)){const h=map.get(key(ev.q,ev.r));if(h){setMode('compete');select(h);panToHex(h);}}});li.appendChild(btn);logEl.appendChild(li);
+    }}
+  }
+  async function sendAction(act){
+    if(!networkOnline)return null;
+    const btn=$('studioSubmit');btn.disabled=true;
+    try{
+      const res=await fetch('/api/action?arena='+currentArena,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(act)});
+      const body=await res.json();if(!res.ok)throw Error(body.error||'Action rejected');
+      applyNetwork(body.state);if(act.type!=='voucher')toast(act.type==='siege'?'Siege initiated. The territory is locked until the siege resolves.':'Arena updated for every connected visitor.');return body;
+    }catch(e){toast('Unable to complete action: '+e.message);await fetchState();return null;}
+    finally{btn.disabled=false;}
+  }
+  async function fetchState(){
+    try{const res=await fetch('/api/state?arena='+currentArena,{credentials:'same-origin'});if(!res.ok)throw Error('No multiplayer server');const snap=await res.json();if(!networkOnline){networkOnline=true;localReady=false;}statusLine('online');applyNetwork(snap);return true;}catch(e){if(networkOnline){statusLine('connecting');toast('Connection lost. Shared changes are temporarily unavailable.');}return false;}
+  }
+  async function connectArena(){
+    if(networkStream){networkStream.close();networkStream=null;}
+    networkRev=0;await fetchState();
+    if(!networkOnline)return;
+    const a=currentArena;networkStream=new EventSource('/api/events?arena='+a,{withCredentials:true});
+    networkStream.addEventListener('state',e=>{if(a!==currentArena)return;try{applyNetwork(JSON.parse(e.data));statusLine('online');}catch(err){console.error('State update failed',err);}});
+    networkStream.onerror=()=>statusLine('connecting');
+  }
+  function tickLifecycle(){
+    if(networkOnline){let refresh=false;for(const h of hexes){if(!occ(h))continue;const old=h.status;
+       h.daysLeft=Math.max(0,Math.ceil(((h.expiresAt||Date.now())-Date.now())/864e5));h.shieldH=Math.max(0,Math.ceil(((h.shieldUntil||0)-Date.now())/36e5));
+       h.lockS=h.siege?Math.max(0,Math.ceil((h.siege.endsAt-Date.now())/1000)):0;h.status=h.siege?'attack':h.shieldH>0?'shielded':'held';if(old!==h.status)refresh=true;}
+      if(refresh)afterChange();if(selected)renderCard();return;
+    }
+    let changed=false;for(const h of hexes){if(!occ(h)||!h.expiresAt)continue;
+      if(h.expiresAt<=Date.now()){h.brand=null;h.loot=null;changed=true;continue;}
+      h.daysLeft=Math.max(0,Math.ceil((h.expiresAt-Date.now())/864e5));h.shieldH=Math.max(0,Math.ceil(((h.shieldUntil||0)-Date.now())/36e5));
+      if(h.status==='shielded'&&h.shieldH<=0){h.status='held';changed=true;}
+    }
+    for(const sl of BOARDS)if(sl.booked&&sl.booked.until<=Date.now()){sl.booked=null;changed=true;}
+    if(changed)afterChange();else if(selected)renderCard();
+  }
+
+  /* ---------------- Board & Arena State ---------------- */
+  let currentArena = '61'; // '61', '469', '4921'
+  let currentMode = 'compete';
+  const anyModalOpen = () => [...document.querySelectorAll('.modal-back')].some(m => !m.hidden);
+  let currentRadius = 4;
+  let hexes = [], map = new Map(), brands = [];
+  const key = (q, r) => q + ',' + r;
+
+  const STREAK_KEY = 'da_streak_v25';
+  const MILESTONES = [
+    { d: 7, name: 'Bronze Vault', perk: '10% off partner codes', col: 'var(--accent)' },
+    { d: 14, name: 'Silver Vault', perk: '15% off + an Airship pass', col: 'var(--warn)' },
+    { d: 21, name: 'Gold Vault', perk: '20% off audits', col: 'var(--magenta)' },
+    { d: 28, name: 'Epoch Vault', perk: 'Free 14-day Wildlands hex claim', col: 'var(--ok)' }
+  ];
+  const todayStr = () => new Date().toLocaleDateString('en-CA');
+  const dayDiff = (a, b) => Math.round((Date.parse(b + 'T00:00:00') - Date.parse(a + 'T00:00:00')) / 86400000);
+  let streakState = { count: 0, last: null, best: 0, claimed: [], vid: 0 };
+  try { const sv = JSON.parse(localStorage.getItem(STREAK_KEY) || 'null'); if (sv && typeof sv.count === 'number') Object.assign(streakState, sv); } catch (_) {}
+  if (!streakState.vid) streakState.vid = Math.floor(Math.random() * 1e9);
+  const demoStreak = parseInt(new URLSearchParams(location.search).get('streak'), 10);
+  if (demoStreak > 0) {
+    streakState.count = demoStreak; streakState.best = Math.max(streakState.best, demoStreak);
+    streakState.last = new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+  }
+  let hasCheeredToday = false;
+  function saveStreak() { try { localStorage.setItem(STREAK_KEY, JSON.stringify(streakState)); } catch (_) {} }
+  function syncStreakDay() {
+    const t = todayStr();
+    if (streakState.last && dayDiff(streakState.last, t) > 1) streakState.count = 0;
+    hasCheeredToday = streakState.last === t;
+  }
+  syncStreakDay();
+  const voucherCode = d => 'ARCH-' + d + '-' + Math.floor(hash(streakState.vid + d * 7919) * 1679616).toString(36).toUpperCase().padStart(4, '0');
+
+  function initBrands() {
+    brands = [];
+    SEO_BRANDS.forEach((bSpec, i) => {
+      brands.push({
+        id: brands.length, name: bSpec.name, cat: bSpec.cat, tag: bSpec.tag, url: bSpec.url, f: bSpec.f,
+        logo: makeLogo({ shape: i, c1: bSpec.col, c2: '#F2F5FF' }),
+        tints: {}, you: false, dwell: Math.floor(75 + rand() * 120), clicks: Math.floor(180 + rand() * 640), cheers: Math.floor(12 + rand() * 45)
+      });
+    });
+
+    for (let i = 0; i < 28; i++) {
+      const nm = GEN_NAMES[i % GEN_NAMES.length] + (i >= GEN_NAMES.length ? ' Labs' : '');
+      const cat = pick(CATEGORIES);
+      const tag = pick(TAGS_BY_CAT[cat]);
+      const col = pick(['#FF5A5F','#FFB400','#00C2A8','#3B82F6','#A855F7','#EC4899','#84CC16','#06B6D4']);
+      brands.push({
+        id: brands.length, name: nm, cat, tag, url: nm.toLowerCase().replace(/[^a-z0-9]/g, '') + '.io', f: i % 5,
+        logo: makeLogo({ shape: i + 6, c1: col, c2: '#F2F5FF' }),
+        tints: {}, you: false, dwell: Math.floor(62 + rand() * 110), clicks: Math.floor(90 + rand() * 410), cheers: Math.floor(4 + rand() * 30)
+      });
+    }
+  }
+  initBrands();
+  brands.forEach(b => { b.core = true; });
+
+  const YOU = {
+    id: 9999, name: 'Your Brand', cat: 'seo', tag: 'Search & Entity Optimization', url: 'yourbrand.agency', f: 1,
+    logo: makeLogo({ shape: 2, c1: '#22E6FF', c2: '#FF3DCB' }),
+    tints: {}, you: true, dwell: 104, clicks: 420, cheers: 28
+  };
+  brands.push(YOU);
+
+  let nextBrandId = 1000;
+  const NAME_PRE = ['Nex','Vor','Lum','Kri','Axo','Tal','Zen','Orb','Pyr','Quo','Mav','Sol','Ryn','Bel','Dru','Hal','Cin','Wex','Ful','Jor','Mer','Tav','Ilo','Gry','Fen'];
+  const NAME_SUF = ['ova','ix','ion','ar','oum','ex','ly','ora','ia','ox','ara','ari','yx','uix','ent','ity','ium','ify','io'];
+  const NAME_TAIL = ['Labs','Co','Works','Studio','Systems','HQ'];
+  const BRAND_COLS = ['#FF5A5F','#FFB400','#00C2A8','#3B82F6','#A855F7','#EC4899','#84CC16','#06B6D4'];
+  function ensureBrands(target) {
+    const used = new Set(brands.map(b => b.name));
+    let guard = 0;
+    while (brands.length < target && guard++ < target * 30) {
+      const nm = pick(NAME_PRE) + pick(NAME_SUF) + (rand() < 0.3 ? ' ' + pick(NAME_TAIL) : '');
+      if (used.has(nm)) continue;
+      used.add(nm);
+      const cat = pick(CATEGORIES), col = pick(BRAND_COLS);
+      brands.push({
+        id: nextBrandId++, name: nm, cat, tag: pick(TAGS_BY_CAT[cat]),
+        url: nm.toLowerCase().replace(/[^a-z0-9]/g, '') + '.io', f: Math.floor(rand() * 5),
+        logo: makeLogo({ shape: Math.floor(rand() * 6), c1: col, c2: '#F2F5FF' }),
+        tints: {}, you: false, dwell: Math.floor(62 + rand() * 110), clicks: Math.floor(60 + rand() * 380), cheers: Math.floor(2 + rand() * 24)
+      });
+    }
+  }
+
+  const tintOf = b => b.tints[b.f] || (b.tints[b.f] = tinted(b.logo, FACTIONS[b.f].color));
+
+  function setHolder(h, b, day, opts = {}) {
+    h.brand = b; h.day = day;
+    h.last = opts.last ?? Math.round(h.zone.floor * Math.pow(1.2, Math.floor(rand() * 4)));
+    h.weeks = opts.weeks ?? 0; h.status = opts.status ?? 'held';
+    h.shieldH = opts.shieldH ?? 0; h.lockS = opts.lockS ?? 0;
+    h.tenancyDays = opts.tenancyDays ?? 14; h.cheers = opts.cheers ?? Math.floor(2 + rand() * 18);
+    h.daysLeft = opts.daysLeft ?? (opts.status === 'shielded' ? h.tenancyDays : Math.max(1, Math.round(h.tenancyDays * (0.25 + rand() * 0.7))));
+    if (h.zone.id === 'metropolis' && !h.bld) {
+      const H = h.d === 0 ? 175 : (h.d === 1 ? 95 : 68);
+      h.bld = rand() < 0.6 ? { tiers: [{ sc: 0.62, h: H * 0.62 }, { sc: 0.44, h: H * 0.38 }] } : { tiers: [{ sc: 0.6, h: H }] };
+    }
+  }
+
+  function rollStatus(h) {
+    const roll = rand();
+    if (roll < 0.38) { h.status = 'shielded'; h.shieldH = 4 + Math.floor(rand() * 160); }
+    else if (roll < 0.48) { h.status = 'attack'; h.lockS = 30 + Math.floor(rand() * 90); }
+    else { h.weeks = Math.floor(rand() * 6); h.status = 'held'; }
+  }
+
+  /* ---------------- Perimeter Cliff Boards Data ---------------- */
+  let BOARDS = [], boardAt = new Map();
+  const fiNow = sl => (sl.d + rot) % 6;
+  const currentAd = (sl, now) => {
+    if (sl.booked) return sl.booked.ad;
+    if (sl.holdAd && now < sl.hold) return sl.holdAd;
+    if (!sl.ads.length) return null;
+    return sl.ads[Math.floor(now / 9000 + sl.i * 0.37) % sl.ads.length];
+  };
+
+  /* ---------------- Interactive Sky Airship ---------------- */
+  const AIR = { ad: ADS[0], t0: 0, dur: 26000, dir: 1, n: 0, pos: null, paid: [], pi: 0, forceMine: false, mine: false };
+  function nextFlight(now) {
+    AIR.paid = AIR.paid.filter(p => p.left > 0);
+    if (AIR.paid.length && (AIR.forceMine || AIR.n % 2 === 0)) {
+      const p = AIR.paid[(AIR.pi++) % AIR.paid.length]; p.left--; AIR.ad = p.ad; AIR.mine = true;
+    } else { AIR.ad = ADS[(AIR.n * 7 + 3) % ADS.length]; AIR.mine = false; }
+    AIR.forceMine = false;
+    AIR.t0 = now; AIR.dir = AIR.n % 2 ? -1 : 1; AIR.n++;
+    $('beaconSponsor').textContent = AIR.ad.name.toUpperCase();
+    updateAirStatus();
+  }
+  function updateAirStatus() {
+    const el = $('airshipStatusText'); if (!el) return;
+    const left = AIR.paid.reduce((a, p) => a + p.left, 0);
+    el.textContent = left ? `Your campaign: ${left} flyover${left === 1 ? '' : 's'} left` : 'Cruising overhead · Click blimp!';
+  }
+
+  /* ---------------- Sonar Radar Sweep Pulse ---------------- */
+  // Spotlight: dims everything except a chosen set of hexes. Used by sonar, the radar and brand profiles.
+  let spot = null, arenaRW = 1;
+  function syncSpotUI() {
+    const on = !!spot && !spot.out;
+    $('spotChip').hidden = !spot;
+    if (spot) $('spotLabel').textContent = spot.label;
+    const rb = $('btnRadarSpot');
+    if (rb) rb.textContent = (on && spot.kind === 'radar') ? 'Clear spotlight' : 'Show hot spots on map';
+  }
+  function setSpot(kind, label, ids, colourOf, extra) {
+    spot = Object.assign({ kind, label, set: new Set(ids), t0: performance.now(), out: 0, lvl: 0, n: ids.length, colourOf: colourOf || (() => '#22E6FF') }, extra || {});
+    syncSpotUI(); dirty = true;
+  }
+  function clearSpot() { if (spot && !spot.out) { spot.out = performance.now(); } syncSpotUI(); dirty = true; }
+  function spotState(now) {
+    if (!spot) return null;
+    if (spot.kind === 'sonar' && !spot.out && now - spot.t0 > spot.dur + spot.linger) spot.out = now;
+    // rAF timestamps can sit a few ms before the performance.now() taken at click time, so clamp the elapsed time
+    const el = Math.max(0, now - spot.t0);
+    let lvl = Math.max(0.02, Math.min(1, el / 350));
+    if (spot.out) lvl = Math.min(lvl, 1 - Math.max(0, now - spot.out) / 350);
+    if (lvl <= 0) { spot = null; syncSpotUI(); return null; }
+    spot.lvl = lvl;
+    if (spot.kind === 'sonar') spot.ringW = Math.min(1, el / spot.dur) * arenaRW;
+    return spot;
+  }
+  const inSpot = (sp, h) => sp.set.has(h.id) && (sp.kind !== 'sonar' || h.rd <= sp.ringW);
+  function triggerSonarPulse() {
+    const ids = []; let atk = 0;
+    for (const h of hexes) if (occ(h) && h.status !== 'shielded') { ids.push(h.id); if (h.status === 'attack') atk++; }
+    setSpot('sonar', `Sonar: ${ids.length} vulnerable hex${ids.length === 1 ? '' : 'es'} · ${atk} under siege`, ids,
+      h => h.status === 'attack' ? '#FF5468' : '#FFB224', { dur: 3200, linger: 5200 });
+    toast(`📡 Sonar sweep: ${ids.length} vulnerable hexes found (${atk} under siege). The rest of the board is dimmed for a few seconds.`);
+  }
+  const triggerSonar = triggerSonarPulse;
+  $('spotClear').addEventListener('click', clearSpot);
+  const panToHex = h => centreOn(h.wx, h.wy, topElev(h), fitZoom * 2.5);
+
+  function buildArena(radiusLimit) {
+    currentRadius = radiusLimit;
+    hexes = []; map.clear();
+    selected = null; hover = null; spot = null; syncSpotUI(); card.hidden = true; $('microCard').hidden = true;
+    ensureBrands(radiusLimit >= 30 ? 260 : (radiusLimit > 4 ? 110 : 0));
+    const is61 = radiusLimit <= 4;
+    const is4921 = radiusLimit >= 30;
+
+    for (let q = -radiusLimit; q <= radiusLimit; q++) {
+      for (let r = Math.max(-radiusLimit, -q - radiusLimit); r <= Math.min(radiusLimit, -q + radiusLimit); r++) {
+        const d = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+        const maxMetro = is61 ? 1 : (is4921 ? 4 : 3);
+        const maxSub = is61 ? 2 : (is4921 ? 16 : 8);
+        const zone = ZONES[d <= maxMetro ? 0 : (d <= maxSub ? 1 : 2)];
+
+        const h = {
+          id: hexes.length, q, r, d, zone,
+          wx: R * SQ3 * (q + r / 2), wy: R * 1.5 * r,
+          brand: null, day: 99, deco: [], flash: 0, tenancyDays: 14
+        };
+        if (!is4921) {
+          const n = 3 + Math.floor(rand() * 4);
+          for (let i = 0; i < n; i++) h.deco.push({ a: rand() * 6.283, rr: 0.38 + rand() * 0.36, k: rand(), sz: 0.05 + rand() * 0.08 });
+        }
+        hexes.push(h); map.set(key(q, r), h);
+      }
+    }
+
+    const shuffledBrands = brands.filter(b => !b.you && (!is61 || b.core));
+    for (let i = shuffledBrands.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [shuffledBrands[i], shuffledBrands[j]] = [shuffledBrands[j], shuffledBrands[i]]; }
+    let brandIdx = 0;
+    for (const h of hexes) {
+      if (rand() > h.zone.occ) continue;
+      const b = shuffledBrands[brandIdx % shuffledBrands.length];
+      brandIdx++;
+      const day = h.zone.id === 'metropolis' ? 1 + Math.floor(rand() * 8) : 4 + Math.floor(rand() * 32);
+      setHolder(h, b, day);
+      rollStatus(h);
+      if (rand() < 0.35) {
+        h.loot = {
+          offer: pick(['15% off technical SEO audit', 'Free backlink analysis', '£100 credit on agency retainer', '20% discount on syndication']),
+          code: 'ARCH-' + Math.floor(1000 + rand() * 8999), left: 5 + Math.floor(rand() * 25)
+        };
+      }
+    }
+
+    applyView(0);
+    initPerimeterBoards();
+    computeClusters();
+    renderRadar();
+    renderStats();
+  }
+
+  function initPerimeterBoards() {
+    BOARDS = []; boardAt = new Map();
+    [...hexes].sort((a, b) => a.wx - b.wx || a.id - b.id).forEach(h => {
+      for (let d = 0; d < 6; d++) {
+        if (!h.nb[d]) {
+          const sl = { i: BOARDS.length, h, d, ads: [], hold: 0, holdAd: null, quad: null };
+          BOARDS.push(sl);
+          boardAt.set(h.id * 6 + d, sl);
+        }
+      }
+    });
+    BOARDS.forEach(sl => {
+      const n = ADS.length;
+      sl.ads = [ADS[(sl.i * 5) % n], ADS[(sl.i * 5 + 3) % n]];
+    });
+  }
+
+  /* ---------------- View Rotation & Coordinates ---------------- */
+  let rot = 0, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  let ORDER = [];
+
+  function applyView(k) {
+    rot = ((k % 6) + 6) % 6;
+    const vm = new Map();
+    for (const h of hexes) {
+      let q = h.q, r = h.r;
+      for (let i = 0; i < rot; i++) { const t = q; q = -r; r = t + r; }
+      h.pq = q; h.pr = r;
+      h.wx = R * SQ3 * (q + r / 2); h.wy = R * 1.5 * r; h.rd = Math.hypot(h.wx, h.wy);
+      vm.set(key(q, r), h);
+    }
+    for (const h of hexes) { h.nb = DIRS.map(([dq, dr]) => vm.get(key(h.pq + dq, h.pr + dr)) || null); h.edge = h.nb.includes(null); }
+    ORDER = [...hexes].sort((a, b) => a.wy - b.wy || a.wx - b.wx);
+    minX = minY = 1e9; maxX = maxY = -1e9;
+    for (const h of hexes) { minX = Math.min(minX, h.wx); maxX = Math.max(maxX, h.wx); minY = Math.min(minY, h.wy); maxY = Math.max(maxY, h.wy); }
+    minX -= R * SQ3 / 2; maxX += R * SQ3 / 2; minY -= R; maxY += R;
+    arenaRW = 0; for (const h of hexes) arenaRW = Math.max(arenaRW, h.rd); arenaRW += R * 1.2;
+  }
+
+  let dayView = TODAY;
+  const occ = h => !!h.brand && h.day <= dayView;
+  const topElev = h => h.zone.elev + (occ(h) ? 3 : 0);
+  const decay = h => Math.pow(0.95, h.weeks);
+  let clusters = [];
+
+  function computeClusters() {
+    clusters = [];
+    for (const h of hexes) h.cl = null;
+    for (const h of hexes) {
+      if (!occ(h) || h.cl) continue;
+      const cl = { brand: h.brand, hexes: [], anchor: null, n: 0 };
+      const st = [h]; h.cl = cl;
+      while (st.length) {
+        const x = st.pop(); cl.hexes.push(x);
+        for (const n of x.nb) if (n && !n.cl && occ(n) && n.brand === h.brand) { n.cl = cl; st.push(n); }
+      }
+      cl.n = cl.hexes.length;
+      cl.anchor = cl.hexes.reduce((a, x) => (x.wy > a.wy || (x.wy === a.wy && x.wx > a.wx)) ? x : a, cl.hexes[0]);
+      clusters.push(cl);
+    }
+  }
+
+  const refundOf = h => Math.round(h.zone.rent / 7 * (h.daysLeft || 0) * 100) / 100;
+  const gbp2 = n => '£' + n.toFixed(2);
+  const takeoverPrice = h => {
+    const base = Math.max(h.zone.floor, Math.round(1.2 * h.last * decay(h)));
+    return (h.cl && h.cl.n >= 5) ? Math.round(base * 1.2) : base;
+  };
+
+  /* ---------------- Camera Engine ---------------- */
+  const stage = $('stage'), canvas = $('board'), ctx = canvas.getContext('2d');
+  let W = 1, H = 1, dpr = 1;
+  const cam = { zoom: 0.5, tx: 0, ty: 0, tilt: 38 * DEG };
+  let K = Math.cos(cam.tilt), SH = Math.sin(cam.tilt);
+  const syncTilt = () => { K = Math.cos(cam.tilt); SH = Math.sin(cam.tilt); };
+  const PX = wx => wx * cam.zoom + cam.tx;
+  const PY = (wy, e) => (wy * K - e * SH) * cam.zoom + cam.ty;
+  let fitZoom = 0.5, autoFit = true, dirty = true, anim = null;
+  const MAX_S = 180;
+
+  // The canvas element itself sits between the side panels (see CSS), so the free area is simply the canvas minus margins.
+  function freeRect() {
+    const tight = innerWidth <= 860 || stage.classList.contains('calm');
+    const bottom = tight ? ($('strip').offsetHeight || 50) + 20 : 76;
+    return { x0: 24, x1: W - 24, y0: 48, y1: H - bottom };
+  }
+
+  function fitParams(tilt) {
+    const k = Math.cos(tilt), sh = Math.sin(tilt);
+    const fr = freeRect(), fw = Math.max(80, fr.x1 - fr.x0), fh = Math.max(80, fr.y1 - fr.y0);
+    const vTop = minY * k - 10 * sh, vBot = maxY * k + (BASE + 8) * sh + 4;
+    const zoom = Math.min((fw + 100) / (maxX - minX), fh / (vBot - vTop));
+    return { zoom, tx: (fr.x0 + fr.x1) / 2 - ((minX + maxX) / 2) * zoom, ty: (fr.y0 + fr.y1) / 2 - ((vTop + vBot) / 2) * zoom, tilt };
+  }
+
+  function sizeCanvas() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = canvas.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    W = Math.max(1, Math.floor(r.width)); H = Math.max(1, Math.floor(r.height));
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    fitZoom = fitParams(cam.tilt).zoom;
+  }
+
+  function fit(animate) {
+    const p = fitParams(cam.tilt);
+    if (animate && !reduced) tween(p); else { Object.assign(cam, p); syncTilt(); dirty = true; }
+  }
+
+  const clampZoom = z => clamp(z, fitZoom * 0.7, MAX_S / R);
+  function groundAt(px, py) { return { wx: (px - cam.tx) / cam.zoom, wy: (py - cam.ty) / (cam.zoom * K) }; }
+  function zoomAt(px, py, z) {
+    z = clampZoom(z); autoFit = false;
+    const g = groundAt(px, py);
+    cam.zoom = z; cam.tx = px - g.wx * z; cam.ty = py - g.wy * z * K; dirty = true;
+  }
+  // Eased zoom: wheel notches and +/- buttons set a goal and the camera glides to it about a fixed screen point.
+  let zGoal = null;
+  function zoomTo(px, py, z) { zGoal = { px, py, z: clampZoom(z) }; autoFit = false; anim = null; dirty = true; }
+  function stepZoom() {
+    if (!zGoal) return;
+    const g = zGoal, d = g.z - cam.zoom;
+    if (reduced || Math.abs(d) < g.z * 0.003) { zoomAt(g.px, g.py, g.z); zGoal = null; }
+    else zoomAt(g.px, g.py, cam.zoom + d * 0.2);
+    dirty = true;
+  }
+  function fitHexes(list) {
+    if (!list.length) return;
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const h of list) { x0 = Math.min(x0, h.wx); x1 = Math.max(x1, h.wx); y0 = Math.min(y0, h.wy); y1 = Math.max(y1, h.wy); }
+    const fr = freeRect(), fw = fr.x1 - fr.x0, fh = fr.y1 - fr.y0;
+    const z = clamp(Math.min(fw / ((x1 - x0) + R * SQ3 * 2.4), fh / (((y1 - y0) * K) + R * 3.2)), fitZoom, MAX_S / R * 0.6);
+    centreOn((x0 + x1) / 2, (y0 + y1) / 2, 0, z);
+  }
+
+  function centreOn(wx, wy, e, zoom, tilt = cam.tilt) {
+    zoom = clampZoom(zoom); autoFit = false;
+    const fr = freeRect(), cx = (fr.x0 + fr.x1) / 2, cy = (fr.y0 + fr.y1) / 2;
+    const k = Math.cos(tilt), sh = Math.sin(tilt);
+    const p = { zoom, tilt, tx: cx - wx * zoom, ty: cy - (wy * k - e * sh) * zoom };
+    if (reduced) { Object.assign(cam, p); syncTilt(); dirty = true; } else tween(p);
+  }
+
+  function tween(to) { zGoal = null; anim = { from: { zoom: cam.zoom, tx: cam.tx, ty: cam.ty, tilt: cam.tilt }, to, t0: performance.now(), dur: 450 }; }
+  function stepAnim(now) {
+    if (!anim) return;
+    const k = Math.min(1, (now - anim.t0) / anim.dur), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    for (const p of ['zoom', 'tx', 'ty', 'tilt']) cam[p] = anim.from[p] + (anim.to[p] - anim.from[p]) * e;
+    syncTilt();
+    if (k >= 1) anim = null;
+  }
+
+  /* ---------------- Drawing Canvas Primitives ---------------- */
+  let SZ = 20, tintMode = false, focus = null, hover = null, selected = null;
+  let towerMode = 'low';
+  const LIFT = () => clamp(SH / 0.5, 0, 1);
+  function vtx(h, i, sc, e) { return [PX(h.wx + R * sc * COS[i]), PY(h.wy + R * sc * SIN[i], e)]; }
+  function hexVerts(h, sc, e) { const a = []; for (let i = 0; i < 6; i++) a.push(vtx(h, i, sc, e)); return a; }
+  function pathPts(p) { ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0], p[i][1]); ctx.closePath(); }
+  function uprightHex(cx, cy, r) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const x = cx + r * COS[i], y = cy + r * SIN[i]; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); }
+  const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+  function badge(cx, standY, r, b, alpha, state) {
+    const lf = LIFT(), by = standY - r;
+    ctx.save(); ctx.globalAlpha = alpha;
+    if (lf > 0.05) {
+      ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath();
+      ctx.ellipse(cx, standY + r * 0.05, r * 0.7, Math.max(0.5, r * 0.7 * K * 0.42), 0, 0, 6.283); ctx.fill();
+    }
+    const col = FACTIONS[b.f].color;
+    uprightHex(cx, by, r * 1.08); ctx.fillStyle = col + '22'; ctx.fill();
+    uprightHex(cx, by, r); ctx.fillStyle = 'rgba(8,12,24,.95)'; ctx.fill();
+    ctx.lineWidth = Math.max(1.2, r * 0.08); ctx.strokeStyle = col; ctx.lineJoin = 'round';
+    ctx.stroke();
+    const box = r * 1.25;
+    if (r >= 6) ctx.drawImage(tintMode ? tintOf(b) : b.logo, cx - box / 2, by - box / 2, box, box);
+    if (state && r >= 12) {
+      const stateCol = state === 'shielded' ? '#22E6FF' : '#FF5468';
+      ctx.fillStyle = '#080C18'; ctx.beginPath(); ctx.arc(cx + r * 0.78, by - r * 0.65, r * 0.32, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = stateCol; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.fillStyle = stateCol; ctx.beginPath(); ctx.arc(cx + r * 0.78, by - r * 0.65, r * 0.16, 0, 6.283); ctx.fill();
+    }
+    ctx.restore();
+    return { x: cx, y: by, r };
+  }
+
+  function drawCrown(cx, cy, r) {
+    const w = r * 1.1, hh = r * 0.62;
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, hh / 2); ctx.lineTo(-w / 2, -hh / 4); ctx.lineTo(-w / 4, hh / 8); ctx.lineTo(0, -hh / 2);
+    ctx.lineTo(w / 4, hh / 8); ctx.lineTo(w / 2, -hh / 4); ctx.lineTo(w / 2, hh / 2); ctx.closePath();
+    ctx.fillStyle = '#FFB224'; ctx.fill();
+    ctx.strokeStyle = '#FFE08A'; ctx.lineWidth = Math.max(1, r * 0.07); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Full 3D Skyscraper Prism with Windows & Roof Cap
+  function prism(h, sc, e0, e1, tierIdx) {
+    for (const fi of [1, 2]) {
+      const A = vtx(h, fi, sc, e1), B = vtx(h, fi + 1, sc, e1), C = vtx(h, fi + 1, sc, e0), D = vtx(h, fi, sc, e0);
+      pathPts([A, B, C, D]);
+      ctx.fillStyle = fi === 1 ? '#1C2C5E' : '#0F1938';
+      ctx.fill();
+
+      // Procedural Skyscraper Lit Windows
+      if (SZ >= 18 && SH > 0.15) {
+        const rows = Math.max(1, Math.floor((e1 - e0) / 8)), cols = 3;
+        const faceH = D[1] - A[1];
+        const ww = Math.abs(B[0] - A[0]) / cols * 0.42, wh = Math.max(1, faceH / rows * 0.42);
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const v = hash(h.id * 977 + tierIdx * 131 + fi * 37 + r * 11 + c);
+            if (v < 0.45) continue;
+            const u = (c + 0.5) / cols, t = (r + 0.5) / rows;
+            const p = lerp2(lerp2(A, B, u), lerp2(D, C, u), t);
+            ctx.fillStyle = v > 0.9 ? 'rgba(255,210,122,.85)' : v > 0.78 ? 'rgba(255,61,203,.55)' : 'rgba(127,243,255,.6)';
+            ctx.fillRect(p[0] - ww / 2, p[1] - wh / 2, ww, wh);
+          }
+        }
+      }
+    }
+    const top = vtx(h, 2, sc, e1), bot = vtx(h, 2, sc, e0);
+    ctx.strokeStyle = 'rgba(150,190,255,.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(top[0], top[1]); ctx.lineTo(bot[0], bot[1]); ctx.stroke();
+  }
+
+  /* ---------------- Procedural Perimeter Cliff Billboards ---------------- */
+  let boardHits = [], flatHits = [];
+
+  function drawBoard(sl, A, B, C, D, now) {
+    if (A[0] > B[0]) { [A, B] = [B, A]; [C, D] = [D, C]; }
+    sl.quad = [A, B, C, D];
+    const at = (u, v) => lerp2(lerp2(A, B, u), lerp2(D, C, u), v);
+    return paintBoard(sl, at(0.05, 0.14), at(0.95, 0.14), at(0.95, 0.86), at(0.05, 0.86), now);
+  }
+
+  function paintBoard(sl, P0, P1, P2, P3, now) {
+    pathPts([P0, P1, P2, P3]); ctx.fillStyle = '#04060D'; ctx.fill();
+    const ad = currentAd(sl, now);
+    const area = Math.abs((P1[0] - P0[0]) * (P3[1] - P0[1]) - (P1[1] - P0[1]) * (P3[0] - P0[0]));
+    if (area < 60) {
+      pathPts([P0, P1, P2, P3]); ctx.fillStyle = (ad ? ad.col : '#FFB224') + '99'; ctx.fill();
+    } else {
+      const im = (ad || AVAIL_AD).img;
+      ctx.save();
+      ctx.transform((P1[0] - P0[0]) / im.width, (P1[1] - P0[1]) / im.width, (P3[0] - P0[0]) / im.height, (P3[1] - P0[1]) / im.height, P0[0], P0[1]);
+      ctx.drawImage(im, 0, 0);
+      ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(255,200,120,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(P0[0], P0[1]); ctx.lineTo(P1[0], P1[1]); ctx.stroke();
+    return { poly: [P0, P1, P2, P3], slot: sl };
+  }
+
+  function drawFlat(sl, now) {
+    const h = sl.h, i = fiNow(sl), j = (i + 1) % 6;
+    const ex = h.wx + R * COS[i], ey = h.wy + R * SIN[i], fx = h.wx + R * COS[j], fy = h.wy + R * SIN[j];
+    const ax = ex + (fx - ex) * 0.12, ay = ey + (fy - ey) * 0.12, bx = ex + (fx - ex) * 0.88, by = ey + (fy - ey) * 0.88;
+    let nx = (ax + bx) / 2 - h.wx, ny = (ay + by) / 2 - h.wy; const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
+    const gap = R * 0.05, T = R * 0.32;
+    const pt = (x, y, o) => [PX(x + nx * o), PY(y + ny * o, 0)];
+    let A = pt(ax, ay, gap), B = pt(bx, by, gap), Ao = pt(ax, ay, gap + T), Bo = pt(bx, by, gap + T);
+    if (A[0] > B[0]) { [A, B] = [B, A]; [Ao, Bo] = [Bo, Ao]; }
+    let org = A, xv = [B[0] - A[0], B[1] - A[1]], yv = [Ao[0] - A[0], Ao[1] - A[1]];
+    if (xv[0] * yv[1] - xv[1] * yv[0] < 0) { org = Ao; yv = [-yv[0], -yv[1]]; }
+    const P0 = org, P1 = [org[0] + xv[0], org[1] + xv[1]], P3 = [org[0] + yv[0], org[1] + yv[1]], P2 = [P1[0] + yv[0], P1[1] + yv[1]];
+    sl.quad = [P3, P2, P1, P0];
+    flatHits.push(paintBoard(sl, P0, P1, P2, P3, now));
+  }
+
+  /* ---------------- Always-Visible Sky Airship (Smooth, Non-Distorted Signage) ---------------- */
+  function drawAirship(now) {
+    if (!AIR.ad) nextFlight(now);
+    let t = reduced ? 0.42 : (now - AIR.t0) / AIR.dur;
+    if (t > 1) { if(networkOnline){AIR.t0=now;return;}nextFlight(now); return; }
+
+    const targetY = clamp(H * 0.22, 65, 140);
+    const L = clamp(SZ * 3.4, 136, 220);
+    const totalSpan = W + L * 2.4 + 80;
+    const screenX = AIR.dir > 0 ? -L + totalSpan * t : W + L - totalSpan * t;
+    const screenY = targetY + Math.sin(t * Math.PI * 2) * 10;
+    const d = AIR.dir;
+    const Hh = L * 0.32;
+
+    const bw = L * 1.4, bh = L * 0.33;
+    const bx = d > 0 ? screenX - L * 0.72 - bw : screenX + L * 0.72;
+    const by = screenY - bh / 2 + Hh * 0.12;
+    const tail = screenX - d * L * 0.46, tie = d > 0 ? bx + bw : bx;
+
+    // Tow cables
+    ctx.strokeStyle = 'rgba(200,210,230,.65)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(tail, screenY); ctx.lineTo(tie, by + bh * 0.2);
+    ctx.moveTo(tail, screenY); ctx.lineTo(tie, by + bh * 0.8);
+    ctx.stroke();
+
+    // Solid, Crisp, Non-Sliced Banner (Fixes unreadable wavy distortion!)
+    ctx.drawImage(AIR.ad.banner, bx, by, bw, bh);
+
+    // Zeppelin Hull
+    ctx.save(); ctx.translate(screenX, screenY);
+    ctx.fillStyle = '#3B4566';
+    for (const sg of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(-d * L * 0.36, 0); ctx.lineTo(-d * L * 0.53, sg * Hh * 0.78); ctx.lineTo(-d * L * 0.46, 0); ctx.closePath(); ctx.fill();
+    }
+    const g = ctx.createLinearGradient(0, -Hh / 2, 0, Hh / 2);
+    g.addColorStop(0, '#E9EDF7'); g.addColorStop(0.5, '#9CA8C6'); g.addColorStop(1, '#46517A');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, L * 0.5, Hh / 2, 0, 0, 6.283); ctx.fill();
+    ctx.save(); ctx.clip(); ctx.fillStyle = AIR.ad.col; ctx.globalAlpha = 0.9; ctx.fillRect(-L * 0.13, -Hh, L * 0.07, Hh * 2); ctx.restore();
+    ctx.fillStyle = '#1B2236'; rrect(ctx, -L * 0.1, Hh * 0.4, L * 0.2, Hh * 0.24, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(127,243,255,.85)'; for (let i = 0; i < 3; i++) ctx.fillRect(-L * 0.075 + i * L * 0.055, Hh * 0.47, L * 0.032, Hh * 0.09);
+    if (Math.floor(now / 600) % 2 === 0) { ctx.fillStyle = '#FF5468'; ctx.beginPath(); ctx.arc(d * L * 0.49, 0, 3, 0, 6.283); ctx.fill(); }
+    ctx.restore();
+
+    AIR.pos = {
+      x: screenX, y: screenY,
+      box: [Math.min(screenX - L * 0.55, bx), screenY - Hh * 0.9, Math.max(screenX + L * 0.55, bx + bw), Math.max(screenY + Hh * 0.7, by + bh)]
+    };
+  }
+
+  function drawSonarSweep(now) {
+    if (!spot || spot.kind !== 'sonar' || spot.out) return;
+    const p = (now - spot.t0) / spot.dur; if (p >= 1) return;
+    const c0 = hexes.find(h => h.d === 0) || hexes[0];
+    const cx = PX(c0.wx), cy = PY(c0.wy, topElev(c0));
+    const rx = spot.ringW * cam.zoom;
+    ctx.save();
+    for (const [k, a, lw] of [[1, 1 - p * 0.55, 4], [0.93, 0.35 * (1 - p), 2]]) {
+      ctx.beginPath(); ctx.ellipse(cx, cy, Math.max(1, rx * k), Math.max(1, rx * k * K), 0, 0, 6.283);
+      ctx.strokeStyle = `rgba(255, 61, 203, ${a.toFixed(2)})`; ctx.lineWidth = lw;
+      ctx.shadowColor = '#FF3DCB'; ctx.shadowBlur = 16; ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSpotMarks(sp, list, s, now) {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 230), few = list.length < 90;
+    ctx.save(); ctx.globalAlpha = sp.lvl;
+    for (const [h, cx, cy, e] of list) {
+      const col = sp.colourOf(h);
+      if (s < 10) {
+        // at overview zoom, make sieges big and everything else a small dot so a busy continent stays readable
+        const big = sp.kind !== 'sonar' || h.status === 'attack';
+        const r = (big ? Math.max(5, s * 1.7) : Math.max(2.4, s * 0.95)) * (0.85 + 0.3 * pulse);
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.fillStyle = col + (big ? '66' : 'CC'); ctx.fill();
+        if (big) { ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.stroke(); }
+      } else {
+        if (few) { ctx.shadowColor = col; ctx.shadowBlur = 14; }
+        pathPts(hexVerts(h, 1.02, e)); ctx.lineWidth = 2.2 + 1.6 * pulse; ctx.strokeStyle = col; ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /* ---------------- Main Draw Function (With Fast LOD & Unclipped Labels) ---------------- */
+  let hits = [];
+  function draw(now) {
+    SZ = R * cam.zoom;
+    const s = SZ;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const bg = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.max(W, H) * 0.75);
+    bg.addColorStop(0, '#111B3A'); bg.addColorStop(0.55, '#0A1124'); bg.addColorStop(1, '#060A15');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    hits = []; flatHits = []; boardHits = [];
+    const flatB = SH < 0.22;
+    if (flatB) for (const sl of BOARDS) drawFlat(sl, now);
+
+    const pad = Math.max(60, s * 2.5);
+    const selCx = selected ? PX(selected.wx) : 0, selCy = selected ? PY(selected.wy, topElev(selected)) : 0;
+
+    // Fast LOD mode when zoomed out (e.g. Mega Continent overview where s < 10)
+    // Prevents 29,526 separate edge strokes per frame that crashed the browser!
+    const fastLOD = s < 10;
+    const labelQueue = [];
+    const sp = spotState(now), spotVis = [];
+
+    for (const h of ORDER) {
+      const cx = PX(h.wx);
+      if (cx < -pad || cx > W + pad) continue;
+      const o = occ(h), e = topElev(h), z = h.zone;
+      const cy = PY(h.wy, e);
+      if (cy < -pad || cy > H + pad) continue;
+
+      if (fastLOD) {
+        // Ultra-fast single-pass hex polygon for zoomed-out Mega Continent
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const vx = cx + s * COS[i];
+          const vy = cy + s * SIN[i] * K;
+          i ? ctx.lineTo(vx, vy) : ctx.moveTo(vx, vy);
+        }
+        ctx.closePath();
+        const ghostL = !!sp && !inSpot(sp, h);
+        if (ghostL) ctx.globalAlpha = 1 - 0.8 * sp.lvl;
+        ctx.fillStyle = o ? FACTIONS[h.brand.f].color + 'AA' : z.top;
+        ctx.fill();
+        if (s >= 4.5) {
+          ctx.strokeStyle = o ? FACTIONS[h.brand.f].color : 'rgba(160,190,255,0.12)';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+        // Perimeter billboards at overview zoom: a glowing strip in each ad's colour along the front rim
+        if (h.edge && !flatB && SH > 0.02) {
+          for (const fi of [1, 2]) {
+            if (h.nb[fi]) continue;
+            const sl = boardAt.get(h.id * 6 + (fi - rot + 6) % 6); if (!sl) continue;
+            const ad = currentAd(sl, now) || AVAIL_AD, b2 = (fi + 1) % 6;
+            ctx.beginPath(); ctx.moveTo(cx + s * COS[fi], cy + s * SIN[fi] * K + 1); ctx.lineTo(cx + s * COS[b2], cy + s * SIN[b2] * K + 1);
+            ctx.strokeStyle = ad.col; ctx.lineWidth = Math.max(2.4, s * 0.7); ctx.stroke();
+          }
+        }
+        if (ghostL) ctx.globalAlpha = 1; else if (sp) spotVis.push([h, cx, cy, e]);
+        hits.push({ h, poly: hexVerts(h, 1, e), badge: null, rect: null });
+        continue;
+      }
+
+      const ghost = !!sp && !inSpot(sp, h);
+      const dim = (focus !== null && o && h.brand.f !== focus) || ghost;
+      const tv = hexVerts(h, 1, e);
+
+      // 3D Cliff Faces & Perimeter Billboards
+      if (SH > 0.02) {
+        for (const fi of [1, 2]) {
+          const n = h.nb[fi], ne = n ? topElev(n) : -BASE;
+          if (ne >= e) continue;
+          const A = tv[fi], B = tv[(fi + 1) % 6], C = vtx(h, (fi + 1) % 6, 1, ne), D = vtx(h, fi, 1, ne);
+          pathPts([A, B, C, D]); ctx.fillStyle = n ? (fi === 1 ? z.sideR : z.sideL) : (fi === 1 ? '#0D1426' : '#090E1C'); ctx.fill();
+          
+          if (!n && !flatB && s >= 6) {
+            const sl = boardAt.get(h.id * 6 + (fi - rot + 6) % 6);
+            if (sl) boardHits.push(drawBoard(sl, A, B, C, D, now));
+          }
+        }
+      }
+
+      // Hex surface
+      pathPts(tv); ctx.fillStyle = z.top; ctx.fill();
+      if (o) {
+        pathPts(tv); ctx.fillStyle = FACTIONS[h.brand.f].color + (dim ? '10' : '38'); ctx.fill();
+      }
+      if (ghost) { pathPts(tv); ctx.fillStyle = 'rgba(5,9,20,' + (0.68 * sp.lvl).toFixed(2) + ')'; ctx.fill(); }
+      else if (sp) spotVis.push([h, cx, cy, e]);
+
+      // Borders
+      if (ghost) ctx.globalAlpha = 1 - 0.72 * sp.lvl;
+      for (let i = 0; i < 6; i++) {
+        const n = h.nb[i], A = tv[i], B = tv[(i + 1) % 6];
+        if (o && !(n && occ(n) && n.brand.f === h.brand.f)) {
+          ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+          ctx.strokeStyle = FACTIONS[h.brand.f].color; ctx.lineWidth = clamp(s * 0.065, 1.2, 4); ctx.stroke();
+        } else if (!o && (!n || h.id < n.id || occ(n))) {
+          ctx.strokeStyle = 'rgba(160,190,255,.10)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+        }
+      }
+
+      if (ghost) ctx.globalAlpha = 1;
+      const hit = { h, poly: tv, badge: null, rect: null };
+
+      // Occupant visual (Complete 3D Skyscraper with Roof Cap & Pole, or Hex Badge)
+      if (o) {
+        let alpha = ghost ? 1 - 0.8 * sp.lvl : (dim ? 0.22 : 1);
+        if (z.id === 'metropolis' && h.bld) {
+          const tf = towerMode === 'full' ? 1 : 0.5;
+          let ta = alpha;
+          if (towerMode === 'ghost') ta *= 0.28;
+          else if (selected && selected !== h && h.wy > selected.wy) {
+            const tot = h.bld.tiers.reduce((a, t) => a + t.h, 0) * tf, topY = PY(h.wy, e + tot);
+            if (Math.abs(selCx - cx) < s * 0.65 && selCy > topY && selCy < cy + s * 0.3) ta *= 0.22;
+          }
+          ctx.save(); ctx.globalAlpha = ta;
+          let base = e, sc = 0.6;
+          h.bld.tiers.forEach((t, ti) => { prism(h, t.sc, base, base + t.h * tf, ti); base += t.h * tf; sc = t.sc; });
+          // Complete Roof Cap & Faction Rim (Fixes "buildings partially rendered in angled-view")
+          const rv = hexVerts(h, sc, base);
+          pathPts(rv); ctx.fillStyle = '#1C2852'; ctx.fill();
+          ctx.strokeStyle = FACTIONS[h.brand.f].color; ctx.lineWidth = Math.max(1.2, s * 0.04); ctx.stroke();
+          ctx.restore();
+
+          const rx = PX(h.wx), ry = PY(h.wy, base), lf = LIFT();
+          const pole = s * 0.32 * lf, r = s * 0.52;
+          if (lf > 0.05) {
+            ctx.strokeStyle = 'rgba(160,190,255,.65)'; ctx.lineWidth = Math.max(1, s * 0.03);
+            ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx, ry - pole); ctx.stroke();
+          }
+          const standY = ry - pole + (1 - lf) * (cy - ry + r);
+          hit.badge = badge(rx, standY, r, h.brand, alpha, h.status);
+          if (h.d === 0 && r >= 8) drawCrown(hit.badge.x, hit.badge.y - hit.badge.r * 1.18, hit.badge.r);
+          hit.rect = [rx - s * 0.6, ry - pole - r * 2, rx + s * 0.6, cy];
+          if (s >= 14) labelQueue.push({ x: hit.badge.x, y: hit.badge.y + hit.badge.r + 6, brand: h.brand, a: ghost ? 1 - 0.85 * sp.lvl : 1 });
+        } else {
+          const r = s * 0.52, lf = LIFT();
+          const standY = cy - s * 0.06 * lf + r * (1 - lf);
+          hit.badge = badge(cx, standY, r, h.brand, alpha, h.status);
+          if (s >= 14) labelQueue.push({ x: hit.badge.x, y: hit.badge.y + hit.badge.r + 5, brand: h.brand, a: ghost ? 1 - 0.85 * sp.lvl : 1 });
+        }
+      }
+
+      hits.push(hit);
+    }
+
+    // ==================== SECOND PASS: UNCLIPPED BRAND NAME LABELS ====================
+    // Drawn after all hexes so no foreground hex ever clips or cuts off a brand name!
+    if (labelQueue.length) {
+      const fs = clamp(Math.round(s * 0.23), 10, 13);
+      ctx.font = `700 ${fs}px "Chakra Petch", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const lbl of labelQueue) {
+        ctx.globalAlpha = lbl.a;
+        const brandText = lbl.brand.name.toUpperCase();
+        const tw = ctx.measureText(brandText).width + 10;
+        const th = fs + 5;
+        ctx.fillStyle = 'rgba(6, 10, 22, 0.92)';
+        rrect(ctx, lbl.x - tw / 2, lbl.y - th / 2, tw, th, 3);
+        ctx.fill();
+        ctx.strokeStyle = FACTIONS[lbl.brand.f].color;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(brandText, lbl.x, lbl.y + 0.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if (sp) drawSpotMarks(sp, spotVis, s, now);
+    drawAirship(now);
+    drawSonarSweep(now);
+
+    // Outlines on hover / selection
+    if (hover && hover !== selected) {
+      ctx.save(); pathPts(hexVerts(hover, 1, topElev(hover)));
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+    }
+    if (selected) {
+      ctx.save(); ctx.shadowColor = '#22E6FF'; ctx.shadowBlur = 18;
+      pathPts(hexVerts(selected, 1, topElev(selected)));
+      ctx.strokeStyle = '#22E6FF'; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+    }
+
+    placeCard();
+    updateReadout();
+  }
+
+  /* ---------------- Hit Testing ---------------- */
+  function inPoly(p, x, y) {
+    let c = false;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const a = p[i], b = p[j];
+      if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+    }
+    return c;
+  }
+
+  function hitAd(x, y) {
+    if (AIR.pos) {
+      const b = AIR.pos.box;
+      if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) return { isAir: true, ad: AIR.ad };
+    }
+    for (let i = boardHits.length - 1; i >= 0; i--) {
+      if (inPoly(boardHits[i].poly, x, y)) return { isBoard: true, slot: boardHits[i].slot };
+    }
+    for (const bh of flatHits) {
+      if (inPoly(bh.poly, x, y)) return { isBoard: true, slot: bh.slot };
+    }
+    return null;
+  }
+
+  function hitTest(x, y) {
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const ht = hits[i];
+      if (ht.badge && Math.hypot(x - ht.badge.x, y - ht.badge.y) < ht.badge.r * 0.95) return ht.h;
+      if (ht.rect && x >= ht.rect[0] && x <= ht.rect[2] && y >= ht.rect[1] && y <= ht.rect[3]) return ht.h;
+      if (inPoly(ht.poly, x, y)) return ht.h;
+    }
+    return null;
+  }
+
+  /* ---------------- Hex Detail Card ---------------- */
+  const card = $('card');
+  function renderCard() {
+    const h = selected;
+    if (!h) { card.hidden = true; return; }
+    card.hidden = false;
+    $('microCard').hidden = true;
+    const o = occ(h);
+    const g = $('cardLogo').getContext('2d'); g.clearRect(0, 0, 84, 84);
+    if (o) g.drawImage(tintMode ? tintOf(h.brand) : h.brand.logo, 6, 6, 72, 72);
+    else {
+      g.strokeStyle = 'rgba(210,225,255,.5)'; g.lineWidth = 3; g.beginPath();
+      g.moveTo(26, 42); g.lineTo(58, 42); g.moveTo(42, 26); g.lineTo(42, 58); g.stroke();
+    }
+    $('cardTitle').textContent = `Hex (${h.q},${h.r}) · ${o ? h.brand.name : 'Open Territory'}`;
+    $('cardSub').textContent = `${h.zone.short} · Ring ${h.d}${o ? ' · ' + FACTIONS[h.brand.f].name : ''}${h.d === 0 ? ' · 👑 The Crown' : ''}`;
+
+    const rows = [];
+    if (o) {
+      rows.push(['Last Paid', gbp(h.last)]);
+      rows.push(['Takeover Siege Cost', `<b>${gbp(takeoverPrice(h))}</b>`, true]);
+      rows.push(['Weekly Rent Rate', gbp(h.zone.rent)]);
+      rows.push(['Tenancy Remaining', `${h.daysLeft} of ${h.tenancyDays || 14} days (prepaid)`]);
+      rows.push(['Guaranteed Shield', h.status === 'shielded' ? `<span style="color:var(--accent);">Active (${dur(h.shieldH)})</span>` : 'Expired — Vulnerable to Siege']);
+      rows.push(['Community Cheers', `❤️ ${h.cheers || 12} Cheers`]);
+      rows.push(['Pro-Rata Refund If Taken', `<span style="color:var(--ok);">${gbp2(refundOf(h))}</span>`]);
+      rows.push(['Outbound Link', `<a class="brand-link" href="https://${esc(h.brand.url)}" target="_blank" rel="sponsored nofollow noopener">${esc(h.brand.url)} ↗</a>`]);
+    } else {
+      rows.push(['Claim Price (14 Days)', `<b>${gbp(h.zone.rent * 2)}</b>`, true]);
+      rows.push(['Base Weekly Rate', gbp(h.zone.rent)]);
+      rows.push(['Guaranteed Shield', '7 Days Immediate']);
+      rows.push(['Refund Protection', '100% pro-rata daily refund']);
+    }
+    $('cardRows').innerHTML = rows.map(r => `<dt>${r[0]}</dt><dd${r[2] ? ' class="big"' : ''}>${r[1]}</dd>`).join('');
+    $('cardNote').textContent = o ? `Held under fixed advertising tenancy. Unused days are credited pro-rata if displaced.` : `Claiming grants a 7-day inviolable shield before contests open.`;
+
+    const def = $('cardDef');
+    if (o && h.status === 'shielded') {
+      def.innerHTML = `<span style="color:var(--accent);font-weight:600;">Active 7-Day Shield</span> — No bids permitted for ${dur(h.shieldH)}`;
+    } else if (o && h.status === 'attack') {
+      def.innerHTML = `<span style="color:var(--danger);font-weight:600;">Siege In Progress</span> — Lock timer: ${h.lockS}s (anti-sniping active)`;
+    } else {
+      def.innerHTML = '';
+    }
+
+    const lootEl = $('cardLoot');
+    if (o && h.loot) {
+      lootEl.hidden = false;
+      lootEl.innerHTML = `<div class="loot-banner"><span>🎁 ${esc(h.loot.offer)} (${h.loot.left} left)</span><button id="cardLootBtn">Claim Voucher</button></div>`;
+      $('cardLootBtn').onclick = () => {
+        if (networkOnline) {sendAction({type:'voucher',q:h.q,r:h.r}).then(data=>{if(data?.code){copyText(data.code);toast('Voucher code: '+data.code);}});return;}
+        copyText(h.loot.code);
+        if (claimedLoot.has(h.loot.code)) { toast(`You already claimed this voucher. Code ${h.loot.code} copied again.`); return; }
+        claimedLoot.add(h.loot.code);
+        h.loot.left = Math.max(0, h.loot.left - 1);saveLocalWorld();
+        toast(`Voucher code: ${h.loot.code} copied. In production this logs an attributed lead for ${h.brand.name}.`);
+        renderCard();
+      };
+    } else lootEl.hidden = true;
+
+    $('cardProf').hidden = !o;
+    const cb = $('cardCheerBtn');
+    cb.hidden = !o; cb.disabled = hasCheeredToday;
+    cb.textContent = hasCheeredToday ? 'Cheered Today · Back Tomorrow' : '+1 Cheer This Hex (+1 Streak)';
+    const btn = $('cardBtn');
+    btn.disabled = false;
+    if (!o) {
+      btn.textContent = `Claim Hex (${gbp(h.zone.rent * 2)})`;
+    } else if (h.brand.you) {
+      btn.textContent = 'You Hold This Hex'; btn.disabled = true;
+    } else if (h.status === 'shielded') {
+      btn.textContent = `Shielded · Siege Opens in ${dur(h.shieldH)}`; btn.disabled = true;
+    } else {
+      btn.textContent = h.status === 'attack' ? 'Siege already underway' : `Launch Takeover Siege (${gbp(takeoverPrice(h))})`;
+      btn.disabled = h.status === 'attack';
+    }
+  }
+
+  const dur = hh => Math.floor(hh / 24) ? `${Math.floor(hh / 24)}d ${hh % 24}h` : `${hh}h`;
+  let cardPos = null;
+  function placeCard() {
+    if (!selected || card.hidden || innerWidth <= 860) return;
+    const s = SZ, h = selected;
+    const ox = canvas.offsetLeft, ax = PX(h.wx) + ox, ay = PY(h.wy, topElev(h)) - s * 0.6 * LIFT();
+    const cw = card.offsetWidth, ch = card.offsetHeight;
+    let x = ax + s * 1.1 + 14, y = ay - ch / 2;
+    if (x + cw > ox + W - 12) x = ax - s * 1.1 - 14 - cw;
+    x = clamp(x, ox + 12, ox + W - cw - 12); y = clamp(y, 12, H - ch - 74);
+    const k = Math.round(x) + ',' + Math.round(y);
+    if (k !== cardPos) { card.style.left = Math.round(x) + 'px'; card.style.top = Math.round(y) + 'px'; cardPos = k; }
+  }
+
+  function select(h) { selected = h; renderCard(); dirty = true; }
+  $('cardX').addEventListener('click', () => select(null));
+
+  /* ---------------- Micro-Ad Card Popup ---------------- */
+  function openMicroAd(type, ad, sl) {
+    const mc = $('microCard');
+    selected = null; card.hidden = true;
+    mc.hidden = false;
+    $('microBadge').textContent = type === 'air' ? 'Sky Cruiser Airship' : 'Perimeter Cliff Billboard';
+    $('microTitle').textContent = ad.name;
+    $('microTag').textContent = ad.tag;
+    $('microUrl').textContent = ad.url + ' ↗';
+    $('microUrl').href = 'https://' + ad.url;
+    $('microRate').textContent = type === 'air' ? '£3.00 / 50 Passes' : '£1.50 / Day';
+    $('btnMicroClaimCode').onclick = () => {
+      const mcode = ad.name.replace(/[^A-Za-z]/g, '').slice(0, 4).toUpperCase() + '15';
+      copyText(mcode);
+      toast(`Discount code ${mcode} copied for ${ad.name}.`);
+    };
+    const bk = $('btnMicroBookSimilar');
+    bk.disabled = false;
+    bk.textContent = type === 'air' ? 'Book a Flyover (£3)' : 'Book This Slot (£1.50/day)';
+    if (type !== 'air' && sl && sl.booked) { bk.disabled = true; bk.textContent = 'Slot occupied'; }
+    bk.onclick = () => {
+      mc.hidden = true;
+      setMode('advertise');
+      setProduct(type === 'air' ? 'air' : 'board');
+      if (type !== 'air' && sl) selectStudioSlot(sl);
+    };
+  }
+  $('microCardX').addEventListener('click', () => $('microCard').hidden = true);
+  $('btnInspectRim').addEventListener('click', () => { setMode('advertise'); setProduct('board'); });
+  $('btnBookAirship').addEventListener('click', () => { setMode('advertise'); setProduct('air'); });
+  $('skyBeacon').addEventListener('click', () => openMicroAd('air', AIR.ad));
+
+  /* ---------------- Daily Cheer & Streak Mechanics ---------------- */
+  function updateStreakUI() {
+    const n = streakState.count;
+    $('streakDaysLabel').textContent = n === 1 ? '1 Day Active' : `${n} Days Active`;
+    $('streakDaysCount').textContent = `Day ${n}`;
+    $('streakBarProgress').style.width = Math.min(100, Math.round(n / 28 * 100)) + '%';
+    document.querySelectorAll('#streakMilestones span').forEach(sp => sp.classList.toggle('unlocked', streakState.best >= +sp.dataset.d));
+    const b = $('btnDailyCheer');
+    b.disabled = hasCheeredToday;
+    b.textContent = hasCheeredToday ? 'Cheered Today!' : '+1 Cheer';
+  }
+
+  async function handleCheer(h) {
+    if (networkOnline) { if (!h) {toast('Select an occupied hex to cheer first.');return;}await sendAction({type:'cheer',q:h.q,r:h.r});return;}
+    syncStreakDay();
+    if (hasCheeredToday) { toast('You have already cheered today. Come back tomorrow to keep your streak alive.'); updateStreakUI(); return; }
+    if (!h) { toast('Click a brand on the map first, then cheer it. Your daily cheer is still waiting.'); return; }
+    const t = todayStr();
+    streakState.count = (streakState.last && dayDiff(streakState.last, t) === 1) ? streakState.count + 1 : 1;
+    streakState.last = t;
+    streakState.best = Math.max(streakState.best, streakState.count);
+    hasCheeredToday = true;
+    saveStreak();
+    h.cheers = (h.cheers || 10) + 1;
+    h.brand.cheers = (h.brand.cheers || 10) + 1;
+    saveLocalWorld();
+    updateStreakUI();
+    const ms = MILESTONES.find(m => m.d === streakState.count);
+    toast(ms ? `🔓 ${ms.name} unlocked: ${ms.perk}. Open the Streak Vault to reveal your code.`
+             : `🎉 +1 Cheer for ${h.brand.name}. Streak: ${streakState.count} ${streakState.count === 1 ? 'day' : 'days'}.`);
+    pushEvent('star', `<span class="nm" style="color:var(--warn)">Spectator Cheer</span> fortified ${esc(h.brand.name)}`, h);
+    if (selected) renderCard();
+  }
+
+  function openStreakVault() {
+    syncStreakDay();
+    const n = streakState.count, best = streakState.best;
+    const next = MILESTONES.find(m => m.d > n);
+    const cards = MILESTONES.map(m => {
+      const open = best >= m.d, shown = streakState.claimed.includes(m.d);
+      const body = !open
+        ? `<small style="color:var(--muted);">${Math.max(0, m.d - n)} more day${m.d - n === 1 ? '' : 's'} of cheering</small>`
+        : shown
+          ? `<code style="display:block;font:600 13px var(--f-mono);color:#fff;background:#05091A;border:1px dashed ${m.col};border-radius:4px;padding:5px;">${voucherCode(m.d)}</code>`
+          : `<button class="btn primary" data-reveal="${m.d}" style="width:100%;">Reveal Code</button>`;
+      return `<div style="border:1px solid ${open ? m.col : 'var(--line)'};border-radius:6px;padding:12px;background:rgba(255,255,255,${open ? '0.04' : '0.015'});display:grid;gap:6px;text-align:center;opacity:${open ? 1 : 0.7};">
+        <b style="font:700 16px var(--f-display);color:${m.col};">Day ${m.d}</b>
+        <span style="font-size:11.5px;color:#C9D2EA;">${m.name}</span>
+        <small style="color:${m.col};font-size:10.5px;">${m.perk}</small>${body}</div>`;
+    }).join('');
+    $('vaultBody').innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(4,8,18,0.6);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;">
+        <span>Current streak <b style="color:var(--warn);font:600 15px var(--f-display);">${n}</b> ${n === 1 ? 'day' : 'days'}</span>
+        <span>Best <b style="font:600 15px var(--f-display);">${best}</b></span>
+        <span>${hasCheeredToday ? 'Cheered today. Back tomorrow.' : 'Not cheered yet today'}</span>
+        <span>${next ? `Next reward in <b>${next.d - n}</b> day${next.d - n === 1 ? '' : 's'}` : 'All vaults unlocked'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">${cards}</div>
+      <p style="margin:0;color:var(--muted);font-size:11.5px;">Prototype note: in production each code is issued by a specific advertiser and logged as an attributed lead. Missing a day resets the streak, but vaults you have already unlocked stay unlocked.</p>`;
+    openModal('streakModal');
+  }
+  $('vaultBody').addEventListener('click', e => {
+    const b = e.target.closest('[data-reveal]'); if (!b) return;
+    const d = +b.dataset.reveal;
+    if (!streakState.claimed.includes(d)) streakState.claimed.push(d);
+    saveStreak(); copyText(voucherCode(d)); toast(`Code ${voucherCode(d)} copied.`);
+    openStreakVault();
+  });
+
+  function openFame() {
+    const held = new Map();
+    for (const h of hexes) if (occ(h)) held.set(h.brand, (held.get(h.brand) || 0) + 1);
+    const crown = map.get('0,0');
+    const row = (b, right, onclick) => `<button class="fame-row" onclick="${onclick}"><span style="color:${FACTIONS[b.f].color};font-weight:600;">${esc(b.name)}</span><span>${right}</span></button>`;
+    const topCheer = brands.filter(b => !b.you || b.cheers).sort((a, b) => (b.cheers || 0) - (a.cheers || 0)).slice(0, 5);
+    const topLand = [...held.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const oldest = hexes.filter(occ).sort((a, b) => a.day - b.day).slice(0, 5);
+    $('fameBody').innerHTML = `
+      <div style="background:linear-gradient(90deg,rgba(255,178,36,0.14),rgba(255,178,36,0.03));border:1px solid rgba(255,178,36,0.5);border-radius:6px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div><small style="color:var(--warn);font:600 10.5px var(--f-mono);letter-spacing:.1em;">THE CROWN · CENTRE HEX (0,0)</small><br>
+          <b style="font:700 18px var(--f-display);">👑 ${crown && occ(crown) ? esc(crown.brand.name) : 'Unclaimed'}</b></div>
+        ${crown && occ(crown) ? `<button class="btn" onclick="window.focusRadarHex(${crown.id})">Locate</button>` : ''}
+      </div>
+      <div class="fame-grid">
+        <div><h4>Most Cheered</h4>${topCheer.map(b => row(b, `❤️ ${b.cheers || 0}`, `window.locateBrand(${b.id})`)).join('')}</div>
+        <div><h4>Largest Territory</h4>${topLand.map(([b, c]) => row(b, `${c} hex${c === 1 ? '' : 'es'}`, `window.locateBrand(${b.id})`)).join('') || '<small>No territory yet</small>'}</div>
+        <div><h4>Longest-Standing Tenants</h4>${oldest.map(h => row(h.brand, `${TODAY - h.day}d · (${h.q},${h.r})`, `window.focusRadarHex(${h.id})`)).join('')}</div>
+      </div>`;
+    openModal('fameModal');
+  }
+
+  $('btnDailyCheer').addEventListener('click', () => handleCheer(selected && occ(selected) ? selected : null));
+  $('cardCheerBtn').addEventListener('click', () => handleCheer(selected && occ(selected) ? selected : null));
+  $('btnStreakHeader').addEventListener('click', openStreakVault);
+  $('navStreak').addEventListener('click', openStreakVault);
+
+  /* ---------------- Sonar Radar Sweep ---------------- */
+  $('btnSonarSweep').addEventListener('click', triggerSonarPulse);
+  $('btnSonarToolbar').addEventListener('click', triggerSonarPulse);
+
+  /* ---------------- Live Battle Radar List Rendering ---------------- */
+  let radarHot = [];
+  function renderRadar() {
+    let atk = 0, shd = 0, exp = 0; const hot = [];
+    for (const h of hexes) {
+      if (!occ(h)) continue;
+      if (h.status === 'attack') { atk++; hot.push(h); }
+      else if (h.status === 'shielded') { shd++; if (h.shieldH < 24) { exp++; hot.push(h); } }
+    }
+    hot.sort((a, b) => ((b.status === 'attack') - (a.status === 'attack')) || (a.status === 'attack' ? a.lockS - b.lockS : a.shieldH - b.shieldH));
+    radarHot = hot.map(h => h.id);
+    $('radarCount').textContent = hot.length ? `${hot.length} hot` : 'quiet';
+    $('radarSum').innerHTML = `<span class="rs atk">⚔ ${atk} siege${atk === 1 ? '' : 's'}</span><span class="rs shd">🛡 ${shd} shielded</span><span class="rs exp">⏳ ${exp} &lt;24h</span>`;
+    $('radarList').innerHTML = hot.slice(0, 3).map(h => {
+      const isAttack = h.status === 'attack', col = isAttack ? '#FF5468' : '#FFB224';
+      return `<button class="radar-item" data-hex="${h.id}" title="Hex (${h.q},${h.r}) · ${esc(h.zone.short)}">
+        <span class="urgency-dot" style="background:${col};color:${col};"></span>
+        <span class="title" style="color:${FACTIONS[h.brand.f].color}">${esc(h.brand.name)}</span>
+        <span class="timer" style="color:${col};">${isAttack ? 'siege ' + h.lockS + 's' : 'shield ' + dur(h.shieldH)}</span></button>`;
+    }).join('') || '<div class="radar-empty">No sieges or expiring shields right now.</div>';
+    $('btnRadarSpot').disabled = !hot.length && !(spot && spot.kind === 'radar');
+    syncSpotUI();
+  }
+  $('radarList').addEventListener('click', e => { const b = e.target.closest('[data-hex]'); if (b) window.focusRadarHex(+b.dataset.hex); });
+  $('btnRadarSpot').addEventListener('click', () => {
+    if (spot && !spot.out && spot.kind === 'radar') { clearSpot(); return; }
+    if (!radarHot.length) return;
+    setSpot('radar', `Radar: ${radarHot.length} hot spot${radarHot.length === 1 ? '' : 's'} (red = siege, amber = shield ending soon)`, radarHot, h => h.status === 'attack' ? '#FF5468' : '#FFB224');
+    const list = radarHot.map(id => hexes[id]); fitHexes(list.length > 1 ? list : [list[0]]);
+  });
+
+  window.focusRadarHex = function(hId) {
+    closeModals();
+    const h = hexes.find(x => x.id === hId);
+    if (h) {
+      setMode('compete');
+      select(h);
+      centreOn(h.wx, h.wy, topElev(h), fitZoom * 2.5);
+    }
+  };
+
+  /* ---------------- Claim & Siege Card Button Logic ---------------- */
+  $('cardBtn').addEventListener('click', async () => {
+    const h = selected; if (!h) return;
+    if (networkOnline) { await sendAction({type:occ(h)?'siege':'claim',q:h.q,r:h.r,days:Number($('studioTenancy').value)||14,brand:networkCreative(),offer:$('studioLoot').value});return; }
+    if (!occ(h)) {
+      const owner = createPlayerBrand({...networkCreative(),logo:studioLogo});
+      setHolder(h, owner, TODAY, { last: h.zone.rent * 2, status: 'shielded', shieldH: 168, tenancyDays: 14 });
+      h.claimedAt=Date.now();h.expiresAt=h.claimedAt+14*864e5;h.shieldUntil=h.claimedAt+7*864e5;h.loot=offerForNewPlacement();
+      h.flash = performance.now();
+      pushEvent('star', `<span class="nm" style="color:${FACTIONS[YOU.f].color}">Your Brand</span> claimed Hex (${h.q},${h.r}) for ${gbp(h.zone.rent * 2)}`, h);
+      toast(`Claimed Hex (${h.q},${h.r})! 7-day shield active. Tenancy prepaid for 14 days.`);
+      renderEvictionCard(YOU.name, 'Unclaimed Wilderness', `Hex (${h.q},${h.r})`);
+    } else {
+      const prev = h.brand, price = takeoverPrice(h), refund = refundOf(h);
+      const owner = createPlayerBrand({...networkCreative(),logo:studioLogo});
+      setHolder(h, owner, TODAY, { last: price, status: 'shielded', shieldH: 168, tenancyDays: 14 });
+      h.claimedAt=Date.now();h.expiresAt=h.claimedAt+14*864e5;h.shieldUntil=h.claimedAt+7*864e5;h.loot=offerForNewPlacement();
+      h.flash = performance.now();
+      pushEvent('swords', `<span class="nm" style="color:${FACTIONS[YOU.f].color}">Your Brand</span> conquered Hex (${h.q},${h.r}) from <span class="nm" style="color:${FACTIONS[prev.f].color}">${esc(prev.name)}</span>`, h);
+      toast(`Conquered Hex (${h.q},${h.r})! ${prev.name} is refunded ${gbp2(refund)} for its unused days.`);
+      renderEvictionCard(YOU.name, prev.name, `Hex (${h.q},${h.r})`);
+    }
+    afterChange();
+  });
+
+  $('cardProf').addEventListener('click', () => {
+    if (selected && occ(selected)) openProfile(selected.brand);
+  });
+
+  const BASE_TITLE = document.title;
+  const slugOf = n => String(n).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'brand';
+  const brandBySlug = sl => brands.find(b => slugOf(b.name) === sl);
+  const holdingsOf = b => hexes.filter(x => occ(x) && x.brand === b).sort((a, c) => a.d - c.d || a.id - c.id);
+  const hexState = h => h.status === 'attack' ? `<span class="st atk">Siege ${h.lockS}s</span>` : h.status === 'shielded' ? `<span class="st shd">Shield ${dur(h.shieldH)}</span>` : '<span class="st">Open to siege</span>';
+  let profOpen = false, profBrand = null;
+
+  function profileLink(b) { return location.href.split('#')[0] + '#brand=' + slugOf(b.name); }
+  function setLd(id, obj) {
+    let el = document.getElementById(id);
+    if (!obj) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('script'); el.type = 'application/ld+json'; el.id = id; document.head.appendChild(el); }
+    el.textContent = JSON.stringify(obj);
+  }
+
+  function openProfile(b) {
+    profBrand = b;
+    const held = holdingsOf(b);
+    const tally = new Map(); for (const h of hexes) if (occ(h)) tally.set(h.brand, (tally.get(h.brand) || 0) + 1);
+    const ranked = [...tally.entries()].sort((a, c) => c[1] - a[1]).map(e => e[0]);
+    const rank = ranked.indexOf(b) + 1;
+    const rent = held.reduce((a, h) => a + h.zone.rent, 0);
+    const atk = held.filter(h => h.status === 'attack').length, shd = held.filter(h => h.status === 'shielded').length;
+    const zc = ZONES.map(z => [z, held.filter(h => h.zone.id === z.id).length]).filter(x => x[1]);
+    const offers = held.filter(h => h.loot);
+    const crown = held.some(h => h.d === 0);
+    const fcol = FACTIONS[b.f].color;
+    $('profTitle').textContent = 'Brand Profile';
+    $('profBody').innerHTML = `
+      <div class="prof-head">
+        <canvas id="profModalLogo" width="88" height="88"></canvas>
+        <div>
+          <h3 style="color:${fcol}">${esc(b.name)}${crown ? ' 👑' : ''}</h3>
+          <p>${esc(b.tag)}</p>
+          <a class="brand-link" href="https://${esc(b.url)}" target="_blank" rel="sponsored nofollow noopener">https://${esc(b.url)} ↗</a>
+          <div class="chips">
+            <span class="chip" style="color:${fcol};border-color:${fcol}66">${esc(FACTIONS[b.f].name)}</span>
+            <span class="chip">${esc(b.cat)}</span>
+            ${rank ? `<span class="chip">#${rank} of ${ranked.length} by territory</span>` : '<span class="chip">No territory</span>'}
+            ${crown ? '<span class="chip" style="color:var(--warn);border-color:rgba(255,178,36,.5)">Holds the Crown</span>' : ''}
+          </div>
+        </div>
+      </div>
+      <div class="prof-tiles">
+        <button class="prof-tile" id="profTerrBtn" aria-expanded="true" aria-controls="profTerr"><span>Territory held</span><b>${held.length} hex${held.length === 1 ? '' : 'es'} ▾</b><small>Click to show or hide the list</small></button>
+        <div class="prof-tile"><span>Weekly rent roll</span><b>${gbp(rent)}</b><small>${atk} under siege · ${shd} shielded</small></div>
+        <div class="prof-tile"><span>Spectator cheers</span><b>❤️ ${b.cheers || 10}</b></div>
+        <div class="prof-tile"><span>Outbound clicks</span><b>${b.clicks}</b></div>
+        <div class="prof-tile"><span>Avg dwell time</span><b>${b.dwell}+ s</b></div>
+        <div class="prof-tile"><span>Zones</span><b style="font-size:14px">${zc.length ? zc.map(([z, n]) => `<span class="z-${z.id}">${esc(z.short)} ${n}</span>`).join(' · ') : 'None'}</b></div>
+      </div>
+      <section class="prof-terr" id="profTerr">
+        <div class="prof-terr-head">
+          <h4>Territory (${held.length})</h4>
+          <button class="btn" id="profShowMap" type="button" ${held.length ? '' : 'disabled'}>Show all on map</button>
+        </div>
+        <div class="prof-hexlist">${held.length ? held.map(h => `<button class="prof-hex" data-hex="${h.id}" type="button" title="Jump to Hex (${h.q},${h.r})">
+            <span>(${h.q},${h.r})</span><span class="ph-z z-${h.zone.id}">${esc(h.zone.short)}</span><span class="ph-r">Ring ${h.d}${h.d === 0 ? ' · Crown' : ''}</span>${hexState(h)}<span class="ph-go">Go ▸</span></button>`).join('')
+          : '<div class="radar-empty">This brand holds no active territory in the current arena.</div>'}</div>
+      </section>
+      ${offers.length ? `<section class="prof-sec"><h4>Live offers (${offers.length})</h4>${offers.map(h => `<div class="prof-offer"><span>🎁 ${esc(h.loot.offer)} · ${h.loot.left} left · Hex (${h.q},${h.r})</span><button type="button" data-vhex="${h.id}">${networkOnline?'Claim code':'Copy '+esc(h.loot.code)}</button></div>`).join('')}</section>` : ''}
+      <div class="prof-actions">
+        <button class="btn primary" id="profLocate" type="button" ${held.length ? '' : 'disabled'}>Locate on map</button>
+        <a class="btn" href="https://${esc(b.url)}" target="_blank" rel="sponsored nofollow noopener">Visit website ↗</a>
+        <button class="btn" id="profCopy" type="button">Copy profile link</button>
+      </div>`;
+    const cv = $('profModalLogo');
+    cv.getContext('2d').drawImage(tintMode ? tintOf(b) : b.logo, 6, 6, 76, 76);
+    openModal('profModal');
+    profOpen = true;
+    document.title = `${b.name} · Domainarchy brand profile`;
+    try { history.replaceState(null, '', '#brand=' + slugOf(b.name)); } catch (_) {}
+    setLd('ldBrand', { '@context': 'https://schema.org', '@type': 'Organization', name: b.name, description: b.tag, url: 'https://' + b.url });
+  }
+  window.openBrandProfile = id => { const b = brands.find(x => x.id === id); if (b) openProfile(b); };
+  window.addEventListener('popstate',()=>{const sl=(location.hash.match(/^#brand=([a-z0-9-]+)/)||[])[1];if(sl){const b=brandBySlug(sl);if(b)openProfile(b);}else if(profOpen)closeModals();});
+
+  function profClosed() {
+    if (!profOpen) return;
+    profOpen = false; document.title = BASE_TITLE; setLd('ldBrand', null);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+  }
+
+  function showBrandOnMap(b) {
+    const list = holdingsOf(b);
+    if (!list.length) { toast(`${b.name} holds no active territory.`); return; }
+    closeModals(); setMode('compete'); select(null);
+    setSpot('brand', `${b.name}: ${list.length} hex${list.length === 1 ? '' : 'es'} highlighted`, list.map(h => h.id), () => FACTIONS[b.f].color);
+    fitHexes(list);
+  }
+
+  $('profBody').addEventListener('click', e => {
+    const hx = e.target.closest('[data-hex]'); if (hx) { window.focusRadarHex(+hx.dataset.hex); return; }
+    const vbtn=e.target.closest('[data-vhex]');if(vbtn){const h=hexes[Number(vbtn.dataset.vhex)];if(!h)return;if(networkOnline)sendAction({type:'voucher',q:h.q,r:h.r}).then(data=>{if(data?.code){copyText(data.code);toast('Voucher code: '+data.code);}});else{copyText(h.loot.code);toast('Code copied.');}return;}
+    if (e.target.closest('#profTerrBtn')) {
+      const t = $('profTerr'), btn = $('profTerrBtn'), open = t.hidden;
+      t.hidden = !open; btn.setAttribute('aria-expanded', String(open)); return;
+    }
+    if (e.target.closest('#profShowMap')) { showBrandOnMap(profBrand); return; }
+    if (e.target.closest('#profLocate')) { window.locateBrand(profBrand.id); return; }
+    if (e.target.closest('#profCopy')) { copyText(profileLink(profBrand)); toast('Profile link copied.'); }
+  });
+
+  /* ---------------- Explore View ---------------- */
+  let activeCat = 'all', searchQuery = '';
+  function renderDirectory() {
+    const grid = $('dirGrid');
+    const term = searchQuery.toLowerCase().trim();
+    const activeBrands = brands.filter(b => {
+      if (networkOnline && !hexes.some(h => occ(h) && h.brand === b)) return false;
+      if (activeCat !== 'all' && b.cat !== activeCat) return false;
+      if (term && !b.name.toLowerCase().includes(term) && !b.tag.toLowerCase().includes(term) && !b.cat.toLowerCase().includes(term)) return false;
+      return true;
+    });
+
+    grid.innerHTML = activeBrands.map(b => {
+      const held = hexes.filter(h => occ(h) && h.brand === b);
+      return `
+        <article class="brand-card">
+          <div class="brand-card-top">
+            <canvas id="dirLogo_${b.id}" width="56" height="56"></canvas>
+            <div class="brand-card-info">
+              <h3 style="color:${FACTIONS[b.f].color}"><a href="#brand=${slugOf(b.name)}" data-brand="${b.id}" style="color:inherit;text-decoration:none">${esc(b.name)}</a></h3>
+              <p class="tagline">${esc(b.tag)}</p>
+              <div class="badge-row">
+                <span class="badge-zone ${held.length ? held[0].zone.id : 'wildlands'}">${held.length ? held[0].zone.short : 'Unseated'} (${held.length} Hexes)</span>
+                <span class="badge-faction" style="background:${FACTIONS[b.f].color}22;color:${FACTIONS[b.f].color};border:1px solid ${FACTIONS[b.f].color}66">${FACTIONS[b.f].name}</span>
+              </div>
+            </div>
+          </div>
+          <div class="brand-card-middle">
+            <div class="metric-box"><span>Avg Dwell Time</span><b>${b.dwell}+ s</b></div>
+            <div class="metric-box"><span>Community Cheers</span><b>❤️ ${b.cheers || 10}</b></div>
+          </div>
+          <div class="brand-card-bottom">
+            <a class="brand-link" href="https://${esc(b.url)}" target="_blank" rel="sponsored nofollow noopener">${esc(b.url)} ↗</a>
+            <div class="card-actions">
+              <button class="btn" onclick="window.openBrandProfile(${b.id})">Profile</button>
+              <button class="btn" onclick="window.locateBrand(${b.id})">Locate</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join('') || '<p style="color:var(--muted)">No brands match these filters.</p>';
+
+    activeBrands.forEach(b => {
+      const c = document.getElementById(`dirLogo_${b.id}`);
+      if (c) c.getContext('2d').drawImage(tintMode ? tintOf(b) : b.logo, 4, 4, 48, 48);
+    });
+    setLd('ldDirectory', { '@context': 'https://schema.org', '@type': 'ItemList', name: 'Domainarchy brand directory',
+      itemListElement: activeBrands.map((b, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Organization', name: b.name, description: b.tag, url: 'https://' + b.url } })) });
+  }
+  $('dirGrid').addEventListener('click', e => {
+    const a = e.target.closest('a[data-brand]'); if (!a) return;
+    e.preventDefault(); window.openBrandProfile(+a.dataset.brand);
+  });
+
+  window.locateBrand = function(bId) {
+    closeModals();
+    const b = brands.find(x => x.id === bId);
+    if (!b) return;
+    const h = hexes.find(x => occ(x) && x.brand === b);
+    setMode('compete');
+    if (h) {
+      select(h);
+      centreOn(h.wx, h.wy, topElev(h), fitZoom * 2.5);
+    } else {
+      toast(`${b.name} currently holds no active territory.`);
+    }
+  };
+
+  $('dirSearch').addEventListener('input', e => { searchQuery = e.target.value; renderDirectory(); });
+  $('catPills').addEventListener('click', e => {
+    const b = e.target.closest('.cat-pill'); if (!b) return;
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    b.classList.add('active');
+    activeCat = b.dataset.cat;
+    renderDirectory();
+  });
+
+  /* ---------------- Advertise Studio (hex, billboard, airship) ---------------- */
+  const BOARD_RATE = 1.5, AIR_PRICE = 3, AIR_PASSES = 50;
+  const SIDE_NAMES = ['East', 'South-East', 'South-West', 'West', 'North-West', 'North-East'];
+  const SWATCHES = ['#FFB224', '#22E6FF', '#FF3DCB', '#38D68B', '#2F8CFF', '#A374FF', '#F97316', '#FF5468'];
+  let studioSelectedTier = 'metropolis', studioLogo = null, studioProd = 'hex', studioSlot = null, studioColour = SWATCHES[0], pickingSlot = false;
+  const gbpX = n => '£' + n.toFixed(2);
+
+  const slotAngle = sl => (Math.atan2(1.5 * sl.h.r, SQ3 * (sl.h.q + sl.h.r / 2)) * 180 / Math.PI + 360) % 360;
+  const sideOf = sl => Math.floor(((slotAngle(sl) + 30) % 360) / 60);
+  const visibleNow = sl => { const fi = (sl.d + rot) % 6; return fi === 1 || fi === 2; };
+  const slotLabel = sl => `Slot #${sl.i + 1} · ${SIDE_NAMES[sideOf(sl)]} rim · Hex (${sl.h.q},${sl.h.r})`;
+
+  function pickSlot(side) {
+    const free = BOARDS.filter(sl => !sl.booked);
+    const pool = side === 'auto' ? free : free.filter(sl => sideOf(sl) === +side);
+    const vis = pool.filter(visibleNow), use = vis.length ? vis : pool;
+    if (!use.length) return null;
+    const target = side === 'auto' ? 90 : +side * 60;
+    const dd = sl => { const d = Math.abs(slotAngle(sl) - target) % 360; return Math.min(d, 360 - d); };
+    return use.slice().sort((a, b) => dd(a) - dd(b) || a.i - b.i)[0];
+  }
+
+  function refreshSides() {
+    const sel = $('studioSide'), keep = sel.value || 'auto';
+    const free = BOARDS.filter(sl => !sl.booked);
+    let html = `<option value="auto">Best available (front-facing, ${free.filter(visibleNow).length} visible now)</option>`;
+    for (let k = 0; k < 6; k++) {
+      const f = free.filter(sl => sideOf(sl) === k);
+      html += `<option value="${k}">${SIDE_NAMES[k]} · ${f.length} free · ${f.filter(visibleNow).length} visible in current view</option>`;
+    }
+    sel.innerHTML = html; sel.value = keep; if (sel.value !== keep) sel.value = 'auto';
+    sel.disabled = !!studioSlot;
+    const note = $('studioSlotNote');
+    note.innerHTML = studioSlot
+      ? `<span>Chosen on the map: <b style="color:#fff">${esc(slotLabel(studioSlot))}</b></span><button type="button" id="btnClearSlot">Use side instead</button>`
+      : `<span>A free slot is assigned automatically.</span><button type="button" id="btnPickSlot">Pick on the map</button>`;
+  }
+  function selectStudioSlot(sl) { studioSlot = sl.booked ? null : sl; if (sl.booked) toast('That slot is already booked. Pick another.'); refreshSides(); updateStudioPricing(); }
+
+  $('studioLogoFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) { studioLogo = null; renderPreview(); return; }
+    if (!/^image\//.test(f.type) || f.size > 2 * 1024 * 1024) { toast('Please choose an image file under 2 MB.'); e.target.value = ''; return; }
+    const url = URL.createObjectURL(f), img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+      const g = cv.getContext('2d'), sc = Math.min(100 / img.width, 100 / img.height) || 1;
+      const w = img.width * sc, h = img.height * sc;
+      g.drawImage(img, (128 - w) / 2, (128 - h) / 2, w, h);
+      studioLogo = cv; URL.revokeObjectURL(url); renderPreview();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('That image could not be read. Try a PNG, JPG or SVG.'); };
+    img.src = url;
+  });
+
+  function priceRows() {
+    if (studioProd === 'hex') {
+      const z = ZONES.find(x => x.id === studioSelectedTier), td = +$('studioTenancy').value || 14;
+      return { rows: [['Base weekly rent', gbpX(z.rent)], ['Tenancy term', td + ' Days'], ['Guaranteed shield', '7 Days', 'var(--accent)'], ['Pro-rata refund guarantee', '100% unused days', 'var(--ok)']], total: z.rent * td / 7 };
+    }
+    if (studioProd === 'board') {
+      const days = +$('studioDays').value || 7, sl = studioSlot || pickSlot($('studioSide').value);
+      return { rows: [['Rate', gbpX(BOARD_RATE) + ' / day'], ['Duration', days + (days === 1 ? ' Day' : ' Days')], ['Slot', sl ? slotLabel(sl) : 'None free on that side'], ['Exposure', 'Exclusive: only your ad', 'var(--accent)'], ['Pro-rata refund guarantee', '100% unused days', 'var(--ok)']], total: BOARD_RATE * days };
+    }
+    const n = +$('studioPasses').value || 1;
+    return { rows: [['Rate', gbpX(AIR_PRICE) + ' / ' + AIR_PASSES + ' flyovers'], ['Flyovers bought', String(n * AIR_PASSES)], ['Cost per flyover', gbpX(AIR_PRICE / AIR_PASSES)], ['Delivery', 'Alternates with house ads', 'var(--accent)']], total: AIR_PRICE * n };
+  }
+  function updateStudioPricing() {
+    const p = priceRows();
+    $('pricingSummary').innerHTML = p.rows.map(r => `<div class="pricing-row"><span>${r[0]}:</span><b${r[2] ? ` style="color:${r[2]}"` : ''}>${esc(r[1])}</b></div>`).join('')
+      + `<div class="pricing-row total"><span>Total prepaid order:</span><b id="priceTotal">${gbpX(p.total)}</b></div>`;
+    renderPreview();
+  }
+
+  const HEADINGS = {
+    hex: ['Reserve a Hex Territory', 'Reserve a high-visibility hex on the arena with transparent fixed tenancy and guaranteed exposure.', 'Deploy Placement to Arena (Simulated Checkout)'],
+    board: ['Book a Perimeter Billboard', 'Your ad on a cliff-face slot around the edge of the arena, shown on its own for the whole booking. £1.50 a day.', 'Book Billboard Slot (Simulated Checkout)'],
+    air: ['Book a Sky Cruiser Flyover', 'Your banner towed across the board by the Sky Cruiser. £3 buys 50 flyovers, and the first one starts straight away.', 'Book Flyovers (Simulated Checkout)']
+  };
+  function setProduct(p) {
+    studioProd = p;
+    document.querySelectorAll('.prod-tab').forEach(t => { const on = t.dataset.prod === p; t.classList.toggle('active', on); t.setAttribute('aria-selected', String(on)); });
+    document.querySelectorAll('#viewAdvertise [data-for]').forEach(el => { el.hidden = !el.dataset.for.split(' ').includes(p); });
+    $('studioHeading').textContent = HEADINGS[p][0]; $('studioSub').textContent = HEADINGS[p][1]; $('studioSubmit').textContent = HEADINGS[p][2];
+    if (p === 'board') refreshSides();
+    updateStudioPricing();
+  }
+  $('prodTabs').addEventListener('click', e => { const b = e.target.closest('[data-prod]'); if (b) setProduct(b.dataset.prod); });
+  $('studioSlotNote').addEventListener('click', e => {
+    if (e.target.closest('#btnClearSlot')) { studioSlot = null; refreshSides(); updateStudioPricing(); }
+    if (e.target.closest('#btnPickSlot')) { setMode('compete'); pickingSlot = true; toast('Click any billboard on the rim of the board to choose it. Rotate the view (Q / E) to reach other sides.'); }
+  });
+  ['studioDays', 'studioPasses', 'studioSide'].forEach(id => $(id).addEventListener('change', updateStudioPricing));
+  ['studioName', 'studioTag', 'studioUrl'].forEach(id => $(id).addEventListener('input', renderPreview));
+  $('studioSwatches').innerHTML = SWATCHES.map(c => `<button type="button" class="swatch${c === studioColour ? ' on' : ''}" data-col="${c}" style="background:${c}" aria-label="Accent colour ${c}"></button>`).join('');
+  $('studioSwatches').addEventListener('click', e => {
+    const b = e.target.closest('.swatch'); if (!b) return;
+    studioColour = b.dataset.col;
+    document.querySelectorAll('.swatch').forEach(x => x.classList.toggle('on', x === b));
+    renderPreview();
+  });
+
+  document.querySelectorAll('.tier-card-opt').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.tier-card-opt').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      studioSelectedTier = el.dataset.tier;
+      updateStudioPricing();
+    });
+  });
+  $('studioTenancy').addEventListener('change', updateStudioPricing);
+
+  function creative() {
+    return {
+      name: ($('studioName').value.trim() || 'Your Business').slice(0, 26),
+      tag: ($('studioTag').value.trim() || 'Your tagline here').slice(0, 42),
+      url: ($('studioUrl').value.trim().replace(/\s+/g, '').replace(/^https?:\/\//i, '') || 'example.co.uk').slice(0, 120),
+      col: studioColour, logo: studioLogo
+    };
+  }
+  function renderPreview() {
+    $('previewTitle').textContent = { hex: 'Live Interactive Hex Preview', board: 'Cliff Billboard Preview', air: 'Sky Cruiser Banner Preview' }[studioProd];
+    if (studioProd === 'hex') renderHexPreview(); else renderAdPreview();
+  }
+  function renderAdPreview() {
+    const c = $('previewHexCanvas'), g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
+    const ad = creative();
+    if (studioProd === 'board') {
+      g.fillStyle = '#0D1426'; g.fillRect(8, 30, 244, 110); g.fillStyle = '#090E1C'; g.fillRect(8, 140, 244, 28);
+      g.fillStyle = '#04060D'; g.fillRect(18, 42, 224, 82);
+      g.drawImage(adImage(ad, 300, 110), 20, 44, 220, 78);
+      g.strokeStyle = 'rgba(255,200,120,.6)'; g.strokeRect(18.5, 42.5, 223, 81);
+    } else {
+      g.fillStyle = '#3B4566'; g.beginPath(); g.moveTo(40, 40); g.lineTo(26, 20); g.lineTo(54, 38); g.fill();
+      const gr = g.createLinearGradient(0, 24, 0, 56); gr.addColorStop(0, '#E9EDF7'); gr.addColorStop(0.5, '#9CA8C6'); gr.addColorStop(1, '#46517A');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(100, 40, 62, 20, 0, 0, 6.283); g.fill();
+      g.strokeStyle = 'rgba(200,210,230,.65)'; g.beginPath(); g.moveTo(40, 40); g.lineTo(20, 86); g.moveTo(40, 40); g.lineTo(20, 124); g.stroke();
+      g.drawImage(bannerImage(ad), 20, 80, 230, 51);
+    }
+  }
+  function renderHexPreview() {
+    const c = $('previewHexCanvas'), g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    const z = ZONES.find(x => x.id === studioSelectedTier);
+    const fIdx = Number($('studioFaction').value ?? 1);
+    const fCol = FACTIONS[fIdx].color;
+    const cx = c.width / 2, cy = c.height / 2 + 4;
+    const pr = 62;
+
+    g.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const x = cx + pr * COS[i], y = cy + pr * SIN[i];
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.closePath();
+    g.fillStyle = z.top; g.fill();
+    g.fillStyle = fCol + '33'; g.fill();
+    g.strokeStyle = fCol; g.lineWidth = 3.5; g.stroke();
+
+    g.drawImage(studioLogo || YOU.logo, cx - 40, cy - 40, 80, 80);
+  }
+
+    let lastEviction = ['Screaming Frog', 'Moz Pro', 'Hex (0,0)'];
+  function renderEvictionCard(attackerName, defenderName, hexCoord) {
+    lastEviction = [attackerName, defenderName, hexCoord];
+    const claimOnly = defenderName === 'Unclaimed Wilderness' || defenderName === 'Open Grid';
+    const c = $('socialCanvas'), g = c.getContext('2d');
+    const W2 = c.width, H2 = c.height;
+    g.clearRect(0, 0, W2, H2);
+
+    const bg = g.createLinearGradient(0, 0, W2, H2);
+    bg.addColorStop(0, '#060A18'); bg.addColorStop(0.5, '#0E162F'); bg.addColorStop(1, '#060A15');
+    g.fillStyle = bg; g.fillRect(0, 0, W2, H2);
+
+    g.strokeStyle = '#FF5468'; g.lineWidth = 3; g.strokeRect(6, 6, W2 - 12, H2 - 12);
+    g.fillStyle = '#FF5468'; g.font = '700 13px "IBM Plex Mono", monospace';
+    g.fillText(claimOnly ? 'DOMAINARCHY // TERRITORY CLAIMED' : 'DOMAINARCHY // OFFICIAL EVICTION NOTICE', 28, 40);
+
+    g.fillStyle = '#FFFFFF'; g.font = '700 24px "Audiowide", "Chakra Petch", sans-serif';
+    g.fillText(claimOnly ? 'NEW TERRITORY SECURED' : 'TERRITORIAL CONQUEST', 28, 76);
+
+    g.fillStyle = '#22E6FF'; g.font = '600 19px "Chakra Petch", sans-serif';
+    g.fillText(`${attackerName.toUpperCase()}`, 28, 126);
+
+    g.fillStyle = '#8C9ABB'; g.font = '400 14px "IBM Plex Sans", sans-serif';
+    g.fillText(claimOnly ? 'has planted its flag on open territory at' : `has dethroned ${defenderName} and seized control of`, 28, 154);
+
+    g.fillStyle = '#FFB224'; g.font = '700 20px "Chakra Petch", sans-serif';
+    g.fillText(`${hexCoord} · GUARANTEED 7-DAY SHIELD DEPLOYED`, 28, 186);
+  }
+
+  $('btnDownloadCard').addEventListener('click', () => {
+    const c = $('socialCanvas'); const a = document.createElement('a');
+    a.download = 'domainarchy-eviction-notice.png'; a.href = c.toDataURL('image/png'); a.click();
+  });
+
+  async function deployHex() {
+    if (networkOnline) {
+      const target=hexes.filter(h=>h.zone.id===studioSelectedTier&&!occ(h)).sort((a,b)=>a.d-b.d)[0];
+      if(!target){toast('No free hexes in this tier. Choose another.');return;}
+      const data=await sendAction({type:'claim',q:target.q,r:target.r,days:Number($('studioTenancy').value)||14,brand:networkCreative(),offer:$('studioLoot').value});
+      if(data?.ok){setMode('compete');const h=map.get(key(target.q,target.r));if(h){select(h);centreOn(h.wx,h.wy,topElev(h),Math.max(fitZoom*2.5,1.35));}}
+      return;
+    }
+    const c = creative(), name = c.name, tag = c.tag, url = c.url;
+    const fIdx = Number($('studioFaction').value ?? 1);
+    const tenancyDays = +$('studioTenancy').value || 14;
+
+    const playerBrand = createPlayerBrand({name, tag, url, f:fIdx, logo:studioLogo});
+
+    const target = hexes.filter(h => h.zone.id === studioSelectedTier && !occ(h)).sort((a, b) => a.d - b.d)[0];
+    if (!target) {
+      toast(`No open hexes left in ${ZONES.find(x => x.id === studioSelectedTier).label}. Pick another tier, or open the map and siege a hex whose shield has expired.`);
+      return;
+    }
+    setHolder(target, playerBrand, TODAY, { last: target.zone.rent * (tenancyDays / 7), status: 'shielded', shieldH: 168, tenancyDays });
+    target.claimedAt = Date.now(); target.expiresAt = target.claimedAt + tenancyDays * 864e5; target.shieldUntil = target.claimedAt + 7 * 864e5;
+    target.loot = offerForNewPlacement();
+    target.flash = performance.now();
+    pushEvent('star', `<span class="nm" style="color:${FACTIONS[playerBrand.f].color}">${esc(name)}</span> secured Hex (${target.q},${target.r})`, target);
+    renderEvictionCard(name, 'Open Grid', `Hex (${target.q},${target.r})`);
+    toast(`Deployed ${name} to Hex (${target.q},${target.r})! 7-day shield locked.`);
+    afterChange();
+    setMode('compete');
+    select(target);
+    centreOn(target.wx, target.wy, topElev(target), fitZoom * 2.5);
+  }
+
+  async function bookBillboard() {
+    if (networkOnline) {
+      const sl=studioSlot||pickSlot($('studioSide').value);
+      if(!sl){toast('No free billboard on that side.');return;}
+      const result=await sendAction({type:'billboard',slot:sl.i,days:Number($('studioDays').value)||7,brand:networkCreative()});
+      if(result?.ok){studioSlot=null;setMode('compete');refreshSides();centreOn(sl.h.wx,sl.h.wy,topElev(sl.h),Math.max(fitZoom*3,0.9));}return;
+    }
+    const days = +$('studioDays').value || 7;
+    let sl = studioSlot;
+    if (sl && sl.booked) { toast('That slot is already booked. Pick another.'); return; }
+    if (!sl) sl = pickSlot($('studioSide').value);
+    if (!sl) { toast('No free billboard slots on that side. Choose another side.'); return; }
+    const ad = creative(); ad.img = adImage(ad, 300, 110);
+    sl.booked = { ad, days, until: Date.now() + days * 864e5, price: BOARD_RATE * days };
+    studioSlot = null; refreshSides(); saveLocalWorld();
+    pushEvent('star', `<span class="nm" style="color:${ad.col}">${esc(ad.name)}</span> booked rim billboard #${sl.i + 1} for ${days} day${days === 1 ? '' : 's'}`, sl.h);
+    toast(`Billboard booked: ${slotLabel(sl)} for ${days} day${days === 1 ? '' : 's'}, ${gbpX(BOARD_RATE * days)} prepaid. Yours is the only ad on this slot.`);
+    setMode('compete');
+    let guard = 0; while (!visibleNow(sl) && guard++ < 6) rotateView(1);
+    centreOn(sl.h.wx, sl.h.wy, topElev(sl.h), Math.max(fitZoom * 3, 30 / R));
+    dirty = true;
+  }
+
+  async function bookAirship() {
+    if(networkOnline){const res=await sendAction({type:'airship',passes:(Number($('studioPasses').value)||1)*50,brand:networkCreative()});if(res?.ok)setMode('compete');return;}
+    const n = +$('studioPasses').value || 1, ad = creative();
+    ad.img = adImage(ad, 300, 110); ad.banner = bannerImage(ad);
+    AIR.paid.push({ ad, left: n * AIR_PASSES, total: n * AIR_PASSES });
+    AIR.forceMine = true; nextFlight(performance.now());saveLocalWorld();
+    pushEvent('star', `<span class="nm" style="color:${ad.col}">${esc(ad.name)}</span> booked ${n * AIR_PASSES} Sky Cruiser flyovers`, null);
+    toast(`Booked ${n * AIR_PASSES} flyovers for ${gbpX(AIR_PRICE * n)}. Your banner is in the air now.`);
+    setMode('compete'); dirty = true;
+  }
+
+  $('studioForm').addEventListener('submit', e => {
+    e.preventDefault();
+    if (studioProd === 'board') bookBillboard();
+    else if (studioProd === 'air') bookAirship();
+    else deployHex();
+  });
+
+  /* ---------------- Mode Switcher Logic ---------------- */
+  const MODES = ['compete', 'explore', 'advertise'];
+  // Navigation history so Back returns to wherever you came from, without ping-ponging between Explore and Advertise
+  const modeStack = [];
+  function backTarget() { return modeStack.length ? modeStack[modeStack.length - 1] : 'compete'; }
+  function goBack() { setMode(modeStack.pop() || 'compete', true); }
+  function setMode(m, isBack) {
+    if (!isBack && m !== currentMode) {
+      if (m === 'compete') modeStack.length = 0;
+      else if (modeStack[modeStack.length - 1] === m) modeStack.pop();
+      else { modeStack.push(currentMode); if (modeStack.length > 8) modeStack.shift(); }
+    }
+    currentMode = m;
+    pickingSlot = pickingSlot && m === 'compete';
+    MODES.forEach(mode => {
+      const el = $('view' + mode.charAt(0).toUpperCase() + mode.slice(1));
+      const btn = $('mode' + mode.charAt(0).toUpperCase() + mode.slice(1));
+      if (mode === m) {
+        el.style.display = 'block';
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+      } else {
+        el.style.display = 'none';
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      }
+    });
+    const lbl = '\u2190 Back to ' + ({ explore: 'Directory', advertise: 'Studio' }[backTarget()] || 'Board');
+    $('btnAdBack').textContent = lbl; $('btnExploreBack').textContent = lbl;
+    if (m === 'explore') renderDirectory();
+    if (m === 'advertise') { if (studioProd === 'board') refreshSides(); updateStudioPricing(); }
+    if (m === 'compete') { sizeCanvas(); if (autoFit) fit(false); dirty = true; }
+  }
+
+  $('modeCompete').addEventListener('click', () => setMode('compete'));
+  $('modeExplore').addEventListener('click', () => setMode('explore'));
+  $('modeAdvertise').addEventListener('click', () => setMode('advertise'));
+  $('exploreToAdBtn').addEventListener('click', () => setMode('advertise'));
+  $('btnAdBack').addEventListener('click', goBack);
+  $('btnExploreBack').addEventListener('click', goBack);
+
+  /* ---------------- 3-Way Arena Switcher (61, 469, 4921) ---------------- */
+  const arenaMenu = $('arenaMenu');
+  $('arenaToggle').addEventListener('click', e => {
+    e.stopPropagation();
+    arenaMenu.hidden = !arenaMenu.hidden;
+    if (!arenaMenu.hidden) {
+      const r = $('arenaToggle').getBoundingClientRect();
+      arenaMenu.style.top = Math.round(r.bottom + 6) + 'px';
+      arenaMenu.style.right = Math.max(8, Math.round(innerWidth - r.right)) + 'px';
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#arenaToggle') && !e.target.closest('#arenaMenu')) {
+      arenaMenu.hidden = true;
+    }
+  });
+
+  arenaMenu.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const arenaVal = btn.dataset.arena;
+    arenaMenu.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    arenaMenu.hidden = true;
+
+    if (!networkOnline) saveLocalWorld();
+    if (arenaVal === '61') {
+      currentArena = '61';
+      $('arenaLabel').innerHTML = '<span class="al-name">SEO ARENA</span><span class="al-long"> (61 HEX)</span>';
+      buildArena(4);
+      toast('Loaded SEO Agency Arena (61 hexes). High-rivalry single vertical.');
+    } else if (arenaVal === '469') {
+      currentArena = '469';
+      $('arenaLabel').innerHTML = '<span class="al-name">LAUNCH WORLD</span><span class="al-long"> (469 HEX)</span>';
+      buildArena(12);
+      toast('Loaded Launch World (469 hexes). Expansive multi-sector layout.');
+    } else if (arenaVal === '4921') {
+      currentArena = '4921';
+      $('arenaLabel').innerHTML = '<span class="al-name">MEGA CONTINENT</span><span class="al-long"> (4,921 HEX)</span>';
+      buildArena(40);
+      toast('Loaded Mega Continent (4,921 hexes, 40 rings). Fast LOD enabled!');
+    }
+    if (networkOnline) connectArena();
+    else restoreLocalWorld();
+    afterChange();
+    sizeCanvas();
+    fit(true);
+  });
+
+  /* ---------------- Dynamic Relative Camera Presets ---------------- */
+  $('presetOverview').addEventListener('click', () => {
+    autoFit = true;
+    fit(true);
+  });
+
+  $('presetRegion').addEventListener('click', () => {
+    const h = selected || hexes.find(x => x.d === 0) || hexes[0];
+    centreOn(h.wx, h.wy, topElev(h), Math.max(fitZoom * 2.2, 0.6));
+  });
+
+  $('presetCloseup').addEventListener('click', () => {
+    const h = selected || hexes.find(x => x.d === 0) || hexes[0];
+    centreOn(h.wx, h.wy, topElev(h), Math.max(fitZoom * 4.4, 1.35));
+  });
+
+  /* ---------------- Stats Rendering ---------------- */
+  function renderStats() {
+    let claimed = 0, rent = 0, shields = 0;
+    for (const h of hexes) if (occ(h)) { claimed++; rent += h.zone.rent; if (h.status === 'shielded') shields++; }
+    $('stats').innerHTML = [
+      ['Weekly Rent Roll', gbp(rent), ''],
+      ['Claimed Hexes', `${claimed}<small style="font-size:12px;color:var(--muted)">/${hexes.length}</small>`, ''],
+      ['Shields Active', shields, '']
+    ].map(([l, v, c]) => `<div class="stat ${c}"><span>${l}</span><b>${v}</b></div>`).join('');
+    $('statsMini').textContent = `${gbp(rent)}/wk · ${claimed}/${hexes.length} hexes · ${shields} shields`;
+  }
+
+  /* ---------------- War Log & Ticker (Works across all modes!) ---------------- */
+  const LOG_MAX = 7, logEl = $('log'), track = $('track');
+  const tickerQueue = [];
+  let tOff = 0, lastT = 0;
+
+  function focusHexFromAnywhere(h) {
+    if (!h) return;
+    setMode('compete');
+    select(h);
+    centreOn(h.wx, h.wy, topElev(h), fitZoom * 2.6);
+  }
+
+  function bindTickerItem(sp, it) {
+    sp.className = 'item';
+    const urlPart = (it.h && occ(it.h)) ? ` <a class="ticker-url" href="https://${esc(it.h.brand.url)}" target="_blank" rel="sponsored nofollow noopener" onclick="event.stopPropagation()">${esc(it.h.brand.url)} ↗</a>` : '';
+    sp.innerHTML = it.html + urlPart;
+    sp.onclick = () => {
+      if (it.h) focusHexFromAnywhere(it.h);
+      else if (it.air) { setMode('compete'); openMicroAd('air', AIR.ad); }
+    };
+  }
+
+  function pushEvent(icon, html, h, ago) {
+    const colour = { swords: '#FF5468', shield: '#22E6FF', star: '#F5B82E' }[icon] || '#22E6FF';
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.innerHTML = `<span style="color:${colour};font-weight:700;">●</span><span class="m">${html}<span class="t">${ago || 'just now'}</span></span>`;
+    if (h) b.addEventListener('click', () => focusHexFromAnywhere(h));
+    li.appendChild(b); logEl.prepend(li);
+    while (logEl.children.length > LOG_MAX) logEl.lastChild.remove();
+    tickerQueue.push({ html: `<span>${html}</span>`, h: h || null });
+  }
+
+  function initTicker() {
+    track.innerHTML = '';
+    const occupiedHexes = hexes.filter(occ);
+    const h0 = occupiedHexes[0] || hexes[0];
+    const h1 = occupiedHexes[1] || hexes[0];
+    const h2 = occupiedHexes[2] || hexes[0];
+
+    const seed = [
+      { html: `<span><b>${esc(h0.brand ? h0.brand.name : 'Screaming Frog')}</b> reinforced Metropolis tower Hex (${h0.q},${h0.r})</span>`, h: h0 },
+      { html: `<span><b>Bea's Bakes</b> cruising overhead on Sky Airship · Click for 20% off voucher!</span>`, air: true },
+      { html: `<span>Ascending siege active on Hex (${h1.q},${h1.r}) held by <b>${esc(h1.brand ? h1.brand.name : 'Ahrefs')}</b></span>`, h: h1 },
+      { html: `<span>7-day guaranteed shield defended on Hex (${h2.q},${h2.r}) by <b>${esc(h2.brand ? h2.brand.name : 'SEMrush')}</b></span>`, h: h2 }
+    ];
+    for (let i = 0; i < 2; i++) {
+      for (const it of seed) {
+        const sp = document.createElement('span');
+        bindTickerItem(sp, it);
+        track.appendChild(sp);
+      }
+    }
+  }
+
+  function stepTicker(now) {
+    if (reduced) return;
+    const dt = Math.min(64, now - (lastT || now)); lastT = now;
+    tOff -= dt * 0.055;
+    const first = track.firstElementChild;
+    if (first) {
+      const w = first.offsetWidth + 44;
+      if (-tOff > w) {
+        tOff += w;
+        if (tickerQueue.length) {
+          const it = tickerQueue.shift();
+          bindTickerItem(first, it);
+        }
+        track.appendChild(first);
+      }
+    }
+    track.style.transform = `translateX(${tOff}px)`;
+  }
+
+  /* ---------------- Live Simulation Engine ---------------- */
+  let live = true;
+  const simRand = rng(1010);
+  function simTick() {
+    if (networkOnline || !live || dayView < TODAY || document.hidden) return;
+    const r = simRand();
+    const now = performance.now();
+
+    if (r < 0.4) {
+      const cands = hexes.filter(h => occ(h) && !h.brand.you && h.status === 'held');
+      if (!cands.length) return;
+      const h = pick(cands, simRand);
+      const rivals = brands.filter(b => b !== h.brand && !b.you && (currentRadius > 4 || b.core));
+      const attacker = pick(rivals, simRand);
+      const prev = h.brand, price = takeoverPrice(h);
+      setHolder(h, attacker, TODAY, { last: price, status: 'shielded', shieldH: 168 });
+      h.flash = now;
+      pushEvent('swords', `<span class="nm" style="color:${FACTIONS[attacker.f].color}">${esc(attacker.name)}</span> won siege on Hex (${h.q},${h.r}) from ${esc(prev.name)} for ${gbp(price)}`, h);
+      afterChange();
+    } else if (r < 0.65) {
+      const open = hexes.filter(h => !occ(h));
+      if (!open.length) return;
+      const h = pick(open, simRand);
+      const b = pick(brands.filter(x => !x.you && (currentRadius > 4 || x.core)), simRand);
+      setHolder(h, b, TODAY, { last: h.zone.rent * 2, status: 'shielded', shieldH: 168 });
+      h.flash = now;
+      pushEvent('star', `<span class="nm" style="color:${FACTIONS[b.f].color}">${esc(b.name)}</span> claimed open Hex (${h.q},${h.r}) in ${h.zone.short}`, h);
+      afterChange();
+    }
+  }
+  setInterval(simTick, 5000);
+
+  function afterChange() {
+    if (!networkOnline && localReady) saveLocalWorld();
+    computeClusters(); renderStats(); renderRadar();
+    if (currentMode==='explore') renderDirectory();
+    if (selected) renderCard();
+    dirty = true;
+  }
+
+  /* ---------------- Controls & Toolbars ---------------- */
+  $('vAngled').addEventListener('click', () => {
+    $('vAngled').setAttribute('aria-pressed', 'true'); $('vTop').setAttribute('aria-pressed', 'false');
+    setTilt(38 * DEG);
+  });
+  $('vTop').addEventListener('click', () => {
+    $('vTop').setAttribute('aria-pressed', 'true'); $('vAngled').setAttribute('aria-pressed', 'false');
+    setTilt(0);
+  });
+
+  function setTilt(t) {
+    const fr = freeRect(), cx = (fr.x0 + fr.x1) / 2, cy = (fr.y0 + fr.y1) / 2;
+    const g = groundAt(cx, cy);
+    const z = cam.zoom, k = Math.cos(t);
+    const to = autoFit ? fitParams(t) : { zoom: z, tilt: t, tx: cam.tx, ty: cy - g.wy * z * k };
+    if (reduced) { Object.assign(cam, to); syncTilt(); dirty = true; } else tween(to);
+    fitZoom = fitParams(t).zoom;
+  }
+
+  function rotateView(dir) {
+    const fr = freeRect(), cx = (fr.x0 + fr.x1) / 2, cy = (fr.y0 + fr.y1) / 2, g = groundAt(cx, cy);
+    const a = dir * 60 * DEG, c = Math.cos(a), sn = Math.sin(a), nx = g.wx * c - g.wy * sn, ny = g.wx * sn + g.wy * c;
+    anim = null; applyView(rot + dir); computeClusters(); fitZoom = fitParams(cam.tilt).zoom;
+    if (autoFit) { const pp = fitParams(cam.tilt); Object.assign(cam, pp); syncTilt(); }
+    else { cam.tx = cx - nx * cam.zoom; cam.ty = cy - ny * cam.zoom * K; }
+    dirty = true;
+  }
+  $('rotL').addEventListener('click', () => rotateView(-1));
+  $('rotR').addEventListener('click', () => rotateView(1));
+
+  function setTowers(m) {
+    towerMode = m;
+    $('tFull').setAttribute('aria-pressed', String(m === 'full'));
+    $('tLow').setAttribute('aria-pressed', String(m === 'low'));
+    $('tGhost').setAttribute('aria-pressed', String(m === 'ghost'));
+    dirty = true;
+  }
+  $('tFull').addEventListener('click', () => setTowers('full'));
+  $('tLow').addEventListener('click', () => setTowers('low'));
+  $('tGhost').addEventListener('click', () => setTowers('ghost'));
+
+  $('sColour').addEventListener('click', () => {
+    $('sColour').setAttribute('aria-pressed', 'true'); $('sTint').setAttribute('aria-pressed', 'false');
+    tintMode = false; renderCard(); dirty = true;
+  });
+  $('sTint').addEventListener('click', () => {
+    $('sTint').setAttribute('aria-pressed', 'true'); $('sColour').setAttribute('aria-pressed', 'false');
+    tintMode = true; renderCard(); dirty = true;
+  });
+
+  $('zIn').addEventListener('click', () => zoomTo(W / 2, H / 2, (zGoal ? zGoal.z : cam.zoom) * 1.3));
+  $('zOut').addEventListener('click', () => zoomTo(W / 2, H / 2, (zGoal ? zGoal.z : cam.zoom) / 1.3));
+
+  $('liveBtn').addEventListener('click', () => {
+    live = !live; $('liveBtn').setAttribute('aria-pressed', String(live));
+    $('simState').textContent = live ? 'live' : 'paused';
+  });
+
+  // Hide HUD / Clean Focus Mode (Button & Shortcut 'F')
+  function setCalm(v) {
+    stage.classList.toggle('calm', v);
+    $('calmBtn').setAttribute('aria-pressed', String(v));
+    $('calmBtn').textContent = v ? 'Show HUD [F]' : 'Hide HUD [F]';
+    sizeCanvas();
+    if (autoFit) fit(true); else dirty = true;
+    toast(v ? 'HUD panels hidden for full-screen map view (Press F to restore).' : 'HUD panels restored.');
+  }
+  $('calmBtn').addEventListener('click', () => setCalm(!stage.classList.contains('calm')));
+
+  function updateReadout() {
+    const px = Math.round(SZ * 0.54 * 1.25);
+    $('readout').innerHTML = `Logo <b>${px}px</b>`;
+  }
+
+  /* ---------------- Modals & First-Visit Onboarding ---------------- */
+  function openModal(id) {
+    closeModals();
+    $(id).hidden = false;
+  }
+  function closeModals() {
+    document.querySelectorAll('.modal-back').forEach(m => m.hidden = true);
+    profClosed();
+  }
+  $('wmLogo').addEventListener('click', () => openModal('welcomeModal'));
+  $('navWelcome').addEventListener('click', () => openModal('welcomeModal'));
+  $('btnPitchWelcome').addEventListener('click', () => openModal('welcomeModal'));
+  $('navArch').addEventListener('click', () => openModal('archModal'));
+  $('navBackup').addEventListener('click',()=>{
+    if(networkOnline){toast('Shared world data belongs to the server. Back up the server data directory instead.');return;}
+    saveLocalWorld();const blob=new Blob([JSON.stringify({schema:1,exportedAt:new Date().toISOString(),worlds:localWorlds,streak:streakState},null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='domainarchy-local-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    toast('Local world backup exported. Choose Restore Backup in the System menu to import.');
+  });
+  $('restoreBackupBtn').addEventListener('click',()=>{if(networkOnline){toast('Server data cannot be overwritten here.');return;}$('backupUpload').click();});
+  $('backupUpload').addEventListener('change',async e=>{
+    if(networkOnline){toast('Local backups cannot overwrite a shared server arena.');return;}
+    const file=e.target.files?.[0];if(!file)return;
+    try{if(file.size>8*1024*1024)throw Error('Backup exceeds 8 MB');const backup=JSON.parse(await file.text());
+       if(backup.schema!==1||!backup.worlds||typeof backup.worlds!=='object')throw Error('Unrecognised backup format');
+       for(const [arena,world] of Object.entries(backup.worlds)){if(!['61','469','4921'].includes(arena)||!Array.isArray(world.held)||!Array.isArray(world.brands))throw Error('Invalid arena data');}
+       localWorlds=backup.worlds;localStorage.setItem(STORAGE_WORLDS,JSON.stringify(localWorlds));
+       if(backup.streak&&typeof backup.streak.count==='number'){Object.assign(streakState,backup.streak);saveStreak();}
+       location.reload();
+    }catch(err){toast('Could not restore backup: '+err.message);}finally{e.target.value='';}
+  });
+  $('navFame').addEventListener('click', openFame);
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeModals));
+  document.querySelectorAll('.modal-back').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModals(); }));
+
+  // Dismissible Hero Pitch Bar
+  $('btnPitchDismiss').addEventListener('click', () => {
+    $('pitchBar').hidden = true;
+    $('app').style.gridTemplateRows = 'auto minmax(0, 1fr) auto';
+    sizeCanvas();
+    if (autoFit) fit(false); else dirty = true;
+  });
+
+  // Persist "Don't show automatically on startup" preference
+  const HIDE_WELCOME_KEY = 'da_hide_welcome_v24';
+  try {
+    if (localStorage.getItem(HIDE_WELCOME_KEY) === '1') {
+      $('chkHideWelcome').checked = true;
+    }
+    $('chkHideWelcome').addEventListener('change', e => {
+      try {
+        if (e.target.checked) localStorage.setItem(HIDE_WELCOME_KEY, '1');
+        else localStorage.removeItem(HIDE_WELCOME_KEY);
+      } catch (_) {}
+    });
+  } catch (_) {}
+
+  // Path 1: Visitor / Spectator -> Inspect #1 Crown Metropolis Hex & Voucher
+  $('btnPathExplore').addEventListener('click', () => {
+    closeModals();
+    setMode('compete');
+    const centerHex = map.get('0,0') || hexes.find(h => occ(h));
+    if (centerHex) {
+      select(centerHex);
+      panToHex(centerHex);
+      toast('🕵️ Spectator Path: Click "+1 Cheer This Hex" to boost this brand & build your discount streak!');
+    }
+  });
+
+  // Path 2: Founder / Brand -> Find an open hex & open Claim Inspector
+  $('btnPathClaim').addEventListener('click', () => {
+    closeModals();
+    setMode('compete');
+    const openHex = hexes.find(h => !occ(h)) || hexes[hexes.length - 1];
+    if (openHex) {
+      select(openHex);
+      panToHex(openHex);
+      toast(`🏰 Founder Path: Hex (${openHex.q},${openHex.r}) in ${openHex.zone.label} is open from ${gbp(openHex.zone.rent)}/wk!`);
+    }
+  });
+
+  // Path 3: Flash Sponsor -> Open Airship Inspector & trigger Sonar Sweep
+  $('btnPathMicro').addEventListener('click', () => {
+    closeModals();
+    setMode('compete');
+    openMicroAd('air', AIR.ad);
+    triggerSonar();
+  });
+
+  /* ---------------- 4-Step Interactive 30-Second Guided Tour ---------------- */
+  const TOUR_STEPS = [
+    {
+      badge: 'STEP 1 OF 4 · THE LIVE 3D GRID',
+      title: 'Every Hex is a Real Website',
+      body: 'Brands rent 3D hex territories from £1/wk (Wildlands) to £10/wk (Metropolis). Taller center towers get prime traffic, while the Sky Cruiser Airship tows a live banner overhead.',
+      target: () => $('skyBeacon'),
+      onEnter: () => { setMode('compete'); fit(true); }
+    },
+    {
+      badge: 'STEP 2 OF 4 · SPECTATOR HABIT & DEALS',
+      title: 'Vote Daily & Unlock Discount Codes',
+      body: 'Visitors get 1 free "+1 Cheer" every day to fortify their favourite brand. Returning for 7, 14, or 28 days unlocks exclusive 10%–20% founder discount vouchers.',
+      target: () => document.querySelector('.col-left'),
+      onEnter: () => { setMode('compete'); if (stage.classList.contains('calm')) setCalm(false); }
+    },
+    {
+      badge: 'STEP 3 OF 4 · WAR WIRE & MICRO-ADS',
+      title: 'Sonar Radar, Airship & Rim Boards',
+      body: 'Watch real-time claims and sieges in the War Wire, pulse the Sonar Radar [S] to spot vulnerable hexes, or book a £3 Airship flyover and £1.50/day Perimeter Cliff Boards.',
+      target: () => document.querySelector('.col-right'),
+      onEnter: () => { setMode('compete'); triggerSonar(); }
+    },
+    {
+      badge: 'STEP 4 OF 4 · THREE WAYS TO USE IT',
+      title: 'Compete, Explore, or Advertise',
+      body: 'Switch anytime between the 3D Territory Map (Compete), the searchable Business & Voucher Directory (Explore), or the Self-Serve Ad Studio (Advertise).',
+      target: () => $('modeSwitchBar'),
+      onEnter: () => {}
+    }
+  ];
+  let tourIdx = -1;
+
+  function positionTourStep() {
+    if (tourIdx < 0 || tourIdx >= TOUR_STEPS.length) return;
+    const step = TOUR_STEPS[tourIdx];
+    const el = step.target && step.target();
+    const ring = $('tourRing');
+    const card = $('tourCard');
+    $('tourStepBadge').textContent = step.badge;
+    $('tourTitle').textContent = step.title;
+    $('tourBody').textContent = step.body;
+    $('btnTourPrev').disabled = tourIdx === 0;
+    $('btnTourNext').textContent = tourIdx === TOUR_STEPS.length - 1 ? 'Finish Tour ✓' : 'Next Step →';
+
+    const pad = 8;
+    const r = el ? el.getBoundingClientRect() : { left: W * 0.35, top: H * 0.25, width: W * 0.3, height: H * 0.3, right: W * 0.65, bottom: H * 0.55 };
+    ring.style.left = Math.max(8, r.left - pad) + 'px';
+    ring.style.top = Math.max(8, r.top - pad) + 'px';
+    ring.style.width = Math.min(window.innerWidth - 16, r.width + pad * 2) + 'px';
+    ring.style.height = Math.min(window.innerHeight - 16, r.height + pad * 2) + 'px';
+
+    // Position tooltip card near the spotlight without going off-screen
+    const cardW = 360, cardH = 210;
+    let cx = r.right + 18;
+    let cy = r.top;
+    if (cx + cardW > window.innerWidth - 16) {
+      cx = r.left - cardW - 18;
+    }
+    if (cx < 16) {
+      cx = Math.max(16, Math.min(window.innerWidth - cardW - 16, r.left + r.width / 2 - cardW / 2));
+      cy = r.bottom + 18;
+    }
+    if (cy + cardH > window.innerHeight - 16) {
+      cy = Math.max(16, window.innerHeight - cardH - 20);
+    }
+    card.style.left = Math.round(cx) + 'px';
+    card.style.top = Math.round(cy) + 'px';
+  }
+
+  function startTour() {
+    closeModals();
+    tourIdx = 0;
+    $('tourOverlay').hidden = false;
+    if (TOUR_STEPS[0].onEnter) TOUR_STEPS[0].onEnter();
+    positionTourStep();
+  }
+  function endTour() {
+    tourIdx = -1;
+    $('tourOverlay').hidden = true;
+  }
+  $('navTour').addEventListener('click', startTour);
+  $('btnPitchTour').addEventListener('click', startTour);
+  $('btnModalTour').addEventListener('click', startTour);
+  $('btnTourSkip').addEventListener('click', endTour);
+  $('btnTourPrev').addEventListener('click', () => {
+    if (tourIdx > 0) {
+      tourIdx--;
+      if (TOUR_STEPS[tourIdx].onEnter) TOUR_STEPS[tourIdx].onEnter();
+      positionTourStep();
+    }
+  });
+  $('btnTourNext').addEventListener('click', () => {
+    if (tourIdx < TOUR_STEPS.length - 1) {
+      tourIdx++;
+      if (TOUR_STEPS[tourIdx].onEnter) TOUR_STEPS[tourIdx].onEnter();
+      positionTourStep();
+    } else {
+      endTour();
+      toast('🎉 Tour complete! Click any hex on the map to explore or claim territory.');
+    }
+  });
+  window.addEventListener('resize', () => { if (tourIdx >= 0) positionTourStep(); });
+
+  /* ---------------- Pointer & Touch Input ---------------- */
+  const pts = new Map(); let drag = null, pinch = null;
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); anim = null; zGoal = null;
+    if (pts.size === 1) drag = { x: e.offsetX, y: e.offsetY, tx: cam.tx, ty: cam.ty, moved: false };
+    else if (pts.size === 2) { drag = null; const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: cam.zoom }; }
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    if (pts.size === 2 && pinch) { const [a, b] = [...pts.values()]; zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) || 1) / pinch.d); return; }
+    if (drag && pts.size === 1) {
+      const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) > 4) { drag.moved = true; canvas.classList.add('dragging'); }
+      if (drag.moved) { autoFit = false; cam.tx = drag.tx + dx; cam.ty = drag.ty + dy; dirty = true; }
+    }
+    if (e.pointerType === 'mouse' && (!drag || !drag.moved)) {
+      const adHit = hitAd(e.offsetX, e.offsetY);
+      if (adHit) {
+        canvas.style.cursor = 'pointer';
+      } else {
+        const h = hitTest(e.offsetX, e.offsetY);
+        if (h !== hover) { hover = h; dirty = true; }
+        canvas.style.cursor = h ? 'pointer' : '';
+      }
+    }
+  });
+  const endPtr = e => {
+    if (e.type === 'pointerup' && drag && !drag.moved && pts.size === 1) {
+      const adHit = hitAd(e.offsetX, e.offsetY);
+      if (adHit) {
+        if (adHit.isAir) openMicroAd('air', adHit.ad);
+        else if (adHit.isBoard) {
+          if (pickingSlot) { pickingSlot = false; setMode('advertise'); setProduct('board'); selectStudioSlot(adHit.slot); }
+          else openMicroAd('board', currentAd(adHit.slot, performance.now()) || AVAIL_AD, adHit.slot);
+        }
+      } else {
+        select(hitTest(e.offsetX, e.offsetY));
+      }
+    }
+    pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) { drag = null; canvas.classList.remove('dragging'); }
+  };
+  canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+  canvas.addEventListener('wheel', e => { e.preventDefault(); zoomTo(e.offsetX, e.offsetY, (zGoal ? zGoal.z : cam.zoom) * Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+
+  window.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    if (e.key === 'Escape') {
+      if (currentMode !== 'compete' && !anyModalOpen() && tourIdx < 0) { goBack(); return; }
+      pickingSlot = false; clearSpot(); select(null); closeModals(); endTour(); $('microCard').hidden = true; return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey || currentMode !== 'compete' || anyModalOpen() || tourIdx >= 0) return;
+    if (e.key === 'q' || e.key === 'Q') rotateView(-1);
+    if (e.key === 'e' || e.key === 'E') rotateView(1);
+    if (e.key === 'f' || e.key === 'F') setCalm(!stage.classList.contains('calm'));
+    if (e.key === 's' || e.key === 'S') triggerSonarPulse();
+  });
+
+  /* ---------------- Toast Notification ---------------- */
+  const claimedLoot = new Set();
+  async function copyText(t) { try { await navigator.clipboard.writeText(t); return true; } catch (_) { toast('Clipboard blocked. Copy the code from the screen.'); return false; } }
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('on');
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 4800);
+  }
+
+  /* ---------------- Main Render Loop ---------------- */
+  let lastDraw = 0;
+  function loop(now) {
+    stepAnim(now); stepZoom();
+    if (currentMode === 'compete') {
+      const live = dirty || anim || (drag && drag.moved) || pinch || spot || zGoal;
+      if (live || (!reduced && now - lastDraw >= 33)) {
+        draw(now);
+        lastDraw = now;
+        dirty = false;
+      }
+    }
+    stepTicker(now);
+    requestAnimationFrame(loop);
+  }
+
+  $('studioFaction').innerHTML = FACTIONS.map((f, i) => `<option value="${i}">${f.name}</option>`).join('');
+  $('studioFaction').addEventListener('change', renderHexPreview);
+
+  buildArena(4); // Start with 61-Hex SEO Arena
+  restoreLocalWorld(); localReady=true;statusLine('offline');
+  if (location.protocol==='http:'||location.protocol==='https:') connectArena();
+  setInterval(tickLifecycle,1000);
+  initTicker();
+  (function seedWire() {
+    const live = hexes.filter(occ);
+    if (live.length < 6) return;
+    const at = i => live[Math.floor(hash(i * 131 + 7) * live.length)];
+    const col = b => FACTIONS[b.f].color;
+    const a = at(1), b = at(2), c = at(3), d = at(4), e = at(5);
+    pushEvent('star', `<span class="nm" style="color:${col(a.brand)}">${esc(a.brand.name)}</span> claimed open Hex (${a.q},${a.r}) in ${a.zone.short}`, a, '41m ago');
+    pushEvent('shield', `<span class="nm" style="color:${col(b.brand)}">${esc(b.brand.name)}</span> defended Hex (${b.q},${b.r}), shield renewed`, b, '27m ago');
+    pushEvent('swords', `<span class="nm" style="color:${col(c.brand)}">${esc(c.brand.name)}</span> won siege on Hex (${c.q},${c.r}) for ${gbp(takeoverPrice(c))}`, c, '14m ago');
+    pushEvent('star', `<span class="nm" style="color:${col(d.brand)}">${esc(d.brand.name)}</span> reached ${d.cheers || 12} community cheers`, d, '6m ago');
+    pushEvent('swords', `<span class="nm" style="color:${col(e.brand)}">${esc(e.brand.name)}</span> opened a siege on Hex (${e.q},${e.r})`, e, '2m ago');
+  })();
+  updateStreakUI();
+  sizeCanvas(); fit(false);
+  const ro = new ResizeObserver(() => { sizeCanvas(); if (autoFit) fit(false); dirty = true; }); ro.observe(stage); ro.observe(canvas);
+  requestAnimationFrame(loop);
+
+  renderEvictionCard('Screaming Frog', 'Moz Pro', 'Hex (0,0)');
+  if (document.fonts && document.fonts.load) {
+    Promise.all(['700 20px "Chakra Petch"', '500 12px "IBM Plex Sans"', '600 12px "IBM Plex Mono"', '38px Audiowide'].map(f => document.fonts.load(f)))
+      .then(() => {
+        for (const a of ADS) { a.img = adImage(a, 300, 110); a.banner = bannerImage(a); }
+        AVAIL_AD.img = adImage(AVAIL_AD, 300, 110);
+        renderEvictionCard(...lastEviction);
+        dirty = true;
+      }).catch(() => {});
+  }
+  $('menuBtn').addEventListener('click', () => {
+    const nxt = ((+stage.dataset.hud || 0) + 1) % 3;
+    if (nxt) stage.dataset.hud = nxt; else delete stage.dataset.hud;
+    $('menuBtn').setAttribute('aria-expanded', String(!!nxt));
+    $('menuBtn').textContent = ['Panels', 'Radar', 'Wire'][nxt];
+  });
+  setInterval(() => { syncStreakDay(); updateStreakUI(); }, 60000);
+
+  // Header menu: the section links live in a dropdown below 1560px
+  const navTabs = document.querySelector('nav.tabs'), moreBtn = $('moreBtn');
+  moreBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = !navTabs.classList.contains('open');
+    navTabs.classList.toggle('open', open); moreBtn.setAttribute('aria-expanded', String(open));
+    if (open) { const r = moreBtn.getBoundingClientRect(); navTabs.style.top = Math.round(r.bottom + 6) + 'px'; navTabs.style.right = Math.max(8, Math.round(innerWidth - r.right)) + 'px'; navTabs.style.left = 'auto'; }
+  });
+  document.addEventListener('click', e => {
+    if (navTabs.classList.contains('open') && (e.target.closest('nav.tabs button') || !e.target.closest('#moreBtn'))) { navTabs.classList.remove('open'); moreBtn.setAttribute('aria-expanded', 'false'); }
+  });
+  window.addEventListener('resize', () => { navTabs.classList.remove('open'); moreBtn.setAttribute('aria-expanded', 'false'); });
+
+  // Build the crawlable directory markup up front, and expose data for the static exporter
+  renderDirectory();
+  updateAirStatus();
+  window.__DA = {
+    exportBrands: () => brands.filter(b => !b.you).map(b => {
+      const held = holdingsOf(b);
+      return { slug: slugOf(b.name), name: b.name, cat: b.cat, tag: b.tag, url: b.url, faction: FACTIONS[b.f].name, cheers: b.cheers || 0, clicks: b.clicks, dwell: b.dwell,
+        hexes: held.map(h => ({ q: h.q, r: h.r, zone: h.zone.short, ring: h.d, status: h.status })) };
+    })
+  };
+  const deepSlug = (location.hash.match(/^#brand=([a-z0-9-]+)/) || [])[1];
+  const deepBrand = deepSlug ? brandBySlug(deepSlug) : null;
+  if (deepBrand) openProfile(deepBrand);
+  renderHexPreview();
+
+  // Show the Welcome Briefing Modal automatically on first visit (unless opted out)
+  try {
+    if (localStorage.getItem(HIDE_WELCOME_KEY) !== '1' && !deepBrand) {
+      openModal('welcomeModal');
+    }
+  } catch (_) {
+    if (!deepBrand) openModal('welcomeModal');
+  }
+})();

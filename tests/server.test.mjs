@@ -1,0 +1,43 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import {spawn} from 'node:child_process';
+import {setTimeout as sleep} from 'node:timers/promises';
+const port=String(29100+Math.floor(Math.random()*1000));const url='http://127.0.0.1:'+port;
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'domainarchy-suite-'));
+let child;const agents=[];
+async function launch(){child=spawn(process.execPath,['server/index.mjs'],{cwd:path.resolve(''),env:{...process.env,PORT:port,DOMAINARCHY_DATA:path.join(dir,'db.json')},stdio:'pipe'});
+ for(let i=0;i<90;i++){if(child.exitCode!==null)throw Error('server crashed');try{const r=await fetch(url+'/health');if(r.ok)return;}catch{}await sleep(60);}throw Error('server startup timed out');}
+async function request(agent,p,action=null){const hdr=agent.cookie?{'Cookie':agent.cookie}:{};if(action)hdr['Content-Type']='application/json';const resp=await fetch(url+p,{method:action?'POST':'GET',headers:hdr,body:action?JSON.stringify(action):undefined});const cookie=resp.headers.get('set-cookie');if(cookie)agent.cookie=cookie.split(';')[0];return {status:resp.status,data:await resp.json()};}
+const brand=(name,f=0)=>({name,tag:'Automated integration suite',url:'example.com',f});
+test('authoritative shared ownership, conflicts, sessions, rewards, billboards, isolation and restart',async t=>{
+ await launch();t.after(async()=>{child.kill();fs.rmSync(dir,{recursive:true,force:true});});
+ const a={},b={};agents.push(a,b);
+ const snapA=await request(a,'/api/state?arena=61');const snapB=await request(b,'/api/state?arena=61');
+ assert.equal(snapA.status,200);assert.equal(Object.keys(snapA.data.hexes).length,10);
+ assert.notEqual(a.cookie,b.cookie,'independent visitor sessions');
+ const claim=await request(a,'/api/action?arena=61',{type:'claim',q:2,r:1,days:14,brand:brand('A-One'),offer:'Reward code'});
+ assert.equal(claim.status,200,JSON.stringify(claim.data));
+ assert.equal(claim.data.state.hexes['2,1'].mine,true);
+ assert.equal(claim.data.state.hexes['2,1'].loot.code,undefined,'codes not exposed by world state');
+ const second=await request(b,'/api/action?arena=61',{type:'claim',q:2,r:1,days:14,brand:brand('B-Two')});
+ assert.equal(second.status,409,'two visitors cannot claim the same hex');
+ const viewB=await request(b,'/api/state?arena=61');assert.equal(viewB.data.hexes['2,1'].mine,false);
+ assert.equal(viewB.data.hexes['2,1'].brandId,claim.data.state.hexes['2,1'].brandId);
+ const shield=await request(b,'/api/action?arena=61',{type:'siege',q:2,r:1,days:14,brand:brand('B-Two')});
+ assert.equal(shield.status,409,'new occupancy shield enforced on server');
+ const cheer=await request(b,'/api/action?arena=61',{type:'cheer',q:2,r:1});assert.equal(cheer.status,200);
+ const cheer2=await request(b,'/api/action?arena=61',{type:'cheer',q:2,r:1});assert.equal(cheer2.status,409,'one cheer per visitor per day');
+ const voucher=await request(b,'/api/action?arena=61',{type:'voucher',q:2,r:1});assert.equal(voucher.status,200);assert.match(voucher.data.code,/^ARCH-/);
+ const duplicate=await request(b,'/api/action?arena=61',{type:'voucher',q:2,r:1});assert.equal(duplicate.data.code,voucher.data.code);
+ const board=await request(a,'/api/action?arena=61',{type:'billboard',slot:1,days:7,brand:brand('Billboard Client')});assert.equal(board.status,200);
+ const boardConflict=await request(b,'/api/action?arena=61',{type:'billboard',slot:1,days:7,brand:brand('Another Client')});assert.equal(boardConflict.status,409);
+ const air=await request(a,'/api/action?arena=61',{type:'airship',passes:50,brand:brand('Flying Client')});assert.equal(air.status,200);
+ const otherWorld=await request(b,'/api/state?arena=469');assert.equal(otherWorld.data.hexes['2,1'],undefined,'arena states independent');
+ const invalidOrigin=await fetch(url+'/api/action?arena=61',{method:'POST',headers:{'content-type':'application/json','origin':'https://evil.example','cookie':a.cookie},body:JSON.stringify({type:'claim',q:3,r:1,days:14,brand:brand('Nope')})});
+ assert.equal(invalidOrigin.status,403,'cross-origin action rejected');
+ assert.equal(fs.existsSync(path.join(dir,'db.json')),true);
+ child.kill();await new Promise(resolve=>child.once('exit',resolve));await launch();
+ const after=await request(a,'/api/state?arena=61');assert.equal(after.data.hexes['2,1'].mine,true,'owner and world survive restart');
+ assert.equal(after.data.boards['1'].days,7);
+});
